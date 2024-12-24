@@ -36,6 +36,7 @@ def index():
 
     # Create a map centered around the first node
     main_node = mesh_data[0]
+    main_node['alt'] += 100  # Add 100 meters to the primary node's altitude
     logging.info(f"Creating map centered around {main_node['id']} at {main_node['lat']}, {main_node['lon']}.")
     m = folium.Map(location=[main_node['lat'], main_node['lon']], zoom_start=12)
 
