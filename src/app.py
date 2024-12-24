@@ -70,6 +70,19 @@ def index():
                     color='green'
                 ).add_to(m)
 
+    # Add a key to the map
+    key_html = """
+    <div style="position: fixed; 
+                bottom: 50px; left: 50px; width: 150px; height: 90px; 
+                background-color: white; border:2px solid grey; z-index:9999; font-size:14px;">
+        &nbsp;<b>Key</b><br>
+        &nbsp;<i class="fa fa-star" style="color:green"></i>&nbsp;Primary Node<br>
+        &nbsp;<i class="glyphicon glyphicon-exclamation-sign" style="color:red"></i>&nbsp;No Connections<br>
+        &nbsp;<i class="fa fa-map-marker" style="color:blue"></i>&nbsp;Connected Node
+    </div>
+    """
+    m.get_root().html.add_child(folium.Element(key_html))
+
     # Save the map to an HTML file
     m.save('templates/map.html')
     return render_template('map.html')
