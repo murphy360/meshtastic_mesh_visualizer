@@ -1,0 +1,8 @@
+services:
+  mesh-visualizer:
+    image: meshtastic_mesh_visualizer
+    container_name: meshtastic_mesh_visualizer
+    ports:
+      - 5000:5000
+    volumes:
+      - ~/mesh-monitor/data:/data
