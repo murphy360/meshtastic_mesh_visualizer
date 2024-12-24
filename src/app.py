@@ -43,13 +43,18 @@ def index():
     for i, node in enumerate(mesh_data):
         if i == 0:
             icon = folium.Icon(color='green', icon='star', prefix='fa')  # Primary node with a star icon
+            folium.Marker(
+                location=[node['lat'], node['lon']],
+                popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m",
+                icon=icon
+            ).add_to(m)
         else:
             icon = folium.Icon(color='blue')
-        folium.Marker(
-            location=[node['lat'], node['lon']],
-            popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m",
-            icon=icon
-        ).add_to(m)
+            folium.Marker(
+                location=[node['lat'], node['lon']],
+                popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m",
+                icon=icon
+            ).add_to(m)
 
     # Draw lines between direct connections
     for node in mesh_data:
