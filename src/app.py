@@ -39,22 +39,22 @@ def index():
     logging.info(f"Creating map centered around {main_node['id']} at {main_node['lat']}, {main_node['lon']}.")
     m = folium.Map(location=[main_node['lat'], main_node['lon']], zoom_start=12)
 
-    # Add nodes to the map
-    for i, node in enumerate(mesh_data):
-        if i == 0:
-            icon = folium.Icon(color='green', icon='star', prefix='fa')  # Primary node with a star icon
-            folium.Marker(
-                location=[node['lat'], node['lon']],
-                popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m",
-                icon=icon
-            ).add_to(m)
-        else:
-            icon = folium.Icon(color='blue')
-            folium.Marker(
-                location=[node['lat'], node['lon']],
-                popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m",
-                icon=icon
-            ).add_to(m)
+    # Add non-primary nodes to the map first
+    for i, node in enumerate(mesh_data[1:], start=1):
+        icon = folium.Icon(color='blue')
+        folium.Marker(
+            location=[node['lat'], node['lon']],
+            popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m",
+            icon=icon
+        ).add_to(m)
+
+    # Add the primary node last
+    icon = folium.Icon(color='green', icon='star', prefix='fa')  # Primary node with a star icon
+    folium.Marker(
+        location=[main_node['lat'], main_node['lon']],
+        popup=f"Node ID: {main_node['id']}<br>Altitude: {main_node['alt']}m",
+        icon=icon
+    ).add_to(m)
 
     # Draw lines between direct connections
     for node in mesh_data:
