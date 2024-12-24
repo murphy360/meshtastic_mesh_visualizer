@@ -42,7 +42,10 @@ def index():
 
     # Add non-primary nodes to the map first
     for i, node in enumerate(mesh_data[1:], start=1):
-        icon = folium.Icon(color='blue')
+        if not node['connections']:
+            icon = folium.Icon(color='red', icon='exclamation-sign', prefix='glyphicon')  # Node with no connections
+        else:
+            icon = folium.Icon(color='blue')
         folium.Marker(
             location=[node['lat'], node['lon']],
             popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m",
