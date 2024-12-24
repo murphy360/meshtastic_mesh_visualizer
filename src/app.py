@@ -25,6 +25,7 @@ def index():
         logging.info("Reading mesh data from file.")
         with open('/data/mesh_data.json', 'r') as f:
             mesh_data = json.load(f)
+        logging.info(f"Mesh data: {mesh_data}")
     except FileNotFoundError:
         print("File not found. Using sample data.")
         mesh_data = [
