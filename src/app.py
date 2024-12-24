@@ -40,11 +40,12 @@ def index():
     m = folium.Map(location=[main_node['lat'], main_node['lon']], zoom_start=12)
 
     # Add nodes to the map
-    for node in mesh_data:
+    for i, node in enumerate(mesh_data):
+        color = 'green' if i == 0 else 'blue'  # Primary node is green, others are blue
         folium.Marker(
             location=[node['lat'], node['lon']],
             popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m",
-            icon=folium.Icon(color='blue')
+            icon=folium.Icon(color=color)
         ).add_to(m)
 
     # Draw lines between direct connections
@@ -68,7 +69,3 @@ logging.info(os.listdir())
 if __name__ == '__main__':
     logging.info("Starting Flask app.")
     app.run(debug=True)
-
-    
-    
-    
