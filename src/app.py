@@ -41,11 +41,14 @@ def index():
 
     # Add nodes to the map
     for i, node in enumerate(mesh_data):
-        color = 'green' if i == 0 else 'blue'  # Primary node is green, others are blue
+        if i == 0:
+            icon = folium.Icon(color='green', icon='star', prefix='fa')  # Primary node with a star icon
+        else:
+            icon = folium.Icon(color='blue')
         folium.Marker(
             location=[node['lat'], node['lon']],
             popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m",
-            icon=folium.Icon(color=color)
+            icon=icon
         ).add_to(m)
 
     # Draw lines between direct connections
