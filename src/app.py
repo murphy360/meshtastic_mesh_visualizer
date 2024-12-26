@@ -94,8 +94,8 @@ def update_map():
     last_updated = datetime.now().strftime('%Y-%m-%d %H:%M')
     last_updated_html = f"""
     <div style="position: fixed; 
-                bottom: 10px; left: 50px; width: 200px; height: 30px; 
-                background-color: white; border:2px solid grey; z-index:9999; font-size:14px;">
+                bottom: 10px; left: 50px; width: 250px; height: 30px; 
+                background-color: white; border:2px solid grey; z-index:9999; font-size:14px; white-space: nowrap;">
         &nbsp;Last Updated: {last_updated}
     </div>
     """
