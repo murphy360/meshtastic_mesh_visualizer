@@ -128,7 +128,7 @@ def update_map():
 
     logging.info(render_template('map.html'))
 
-    return
+    return render_template('map.html')
 
 class MeshDataHandler(FileSystemEventHandler):
     def on_modified(self, event):
