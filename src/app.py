@@ -25,8 +25,7 @@ mesh_data = [
 
 @app.route('/')
 def index():
-    update_map()
-    return render_template('map.html')
+    return update_map()
 
 
 # Returns the map HTML template
