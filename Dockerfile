@@ -8,7 +8,7 @@ python3-pip \
 vim
 
 # Install Required Python Packages
-RUN pip3 install geopy folium Flask
+RUN pip3 install geopy folium Flask watchdog
 
 # Copy only files in src directory to /app do not copy the src directory itself
 COPY src/ /app

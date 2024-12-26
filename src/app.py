@@ -1,8 +1,11 @@
 import json
 import logging
 import os
+import time
 import folium
 from datetime import datetime
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 from flask import Flask, render_template
 
@@ -105,6 +108,24 @@ def update_map():
     m.save('templates/map.html')
     return render_template('map.html')
 
+class MeshDataHandler(FileSystemEventHandler):
+    def on_modified(self, event):
+        if event.src_path == MESH_DATA_FILE:
+            logging.info("Mesh data file has changed.")
+
+def monitor_data_updates():
+    observer = Observer()
+    event_handler = MeshDataHandler()
+    observer.schedule(event_handler, path=os.path.dirname(MESH_DATA_FILE), recursive=False)
+    observer.start()
+    try:
+        while True:
+            time.sleep(1)
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
+
 if __name__ == '__main__':
     logging.info("Starting Flask app.")
+    monitor_data_updates()
     app.run(debug=True)
