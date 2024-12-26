@@ -26,9 +26,11 @@ mesh_data = [
 @app.route('/')
 def index():
     update_map()
+    logging.info("Rendering map.")
     return render_template('map.html')
 
 def update_map():
+    logging.info("Updating map.")
     global mesh_data
     # Read mesh data from a JSON file
     try:
@@ -120,8 +122,9 @@ def monitor_data_updates():
     observer.start()
     try:
         while True:
-            time.sleep(1)
+            time.sleep(10)  # Refresh data every 10 seconds
             logging.info("Checking for mesh data updates.")
+            update_map()
     except KeyboardInterrupt:
         observer.stop()
     observer.join()
