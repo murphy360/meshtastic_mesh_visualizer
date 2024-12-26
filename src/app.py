@@ -22,6 +22,11 @@ mesh_data = [
 
 @app.route('/')
 def index():
+    update_map()
+    return render_template('map.html')
+
+def update_map():
+    global mesh_data
     # Read mesh data from a JSON file
     try:
         logging.info("Reading mesh data from file.")
@@ -86,7 +91,7 @@ def index():
     m.get_root().html.add_child(folium.Element(key_html))
 
     # Add a "Last Updated" label to the map
-    last_updated = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    last_updated = datetime.now().strftime('%Y-%m-%d %H:%M')
     last_updated_html = f"""
     <div style="position: fixed; 
                 bottom: 10px; left: 50px; width: 200px; height: 30px; 
