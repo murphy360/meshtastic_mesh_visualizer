@@ -25,10 +25,11 @@ mesh_data = [
 
 @app.route('/')
 def index():
-    update_map()
-    logging.info("Rendering map.")
-    return render_template('map.html')
+    map_template = update_map()
+    return map_template
 
+
+# Returns the map HTML template
 def update_map():
     logging.info("Updating map.")
     global mesh_data
@@ -97,6 +98,7 @@ def update_map():
 
     # Add a "Last Updated" label to the map
     last_updated = datetime.now().strftime('%Y-%m-%d %H:%M')
+    logging.info(f"Adding last updated label to the map. Last updated: {last_updated}")
     last_updated_html = f"""
     <div style="position: fixed; 
                 bottom: 10px; left: 50px; width: 250px; height: 30px; 
