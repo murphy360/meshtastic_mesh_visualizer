@@ -3,12 +3,16 @@ import logging
 import os
 import folium
 
-
-from flask import Flask, render_template
+from flask import Flask, render_template, jsonify, send_from_directory
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
 app = Flask(__name__)
+
+# Get the path to the mesh data file from the environment variable
+MESH_DATA_FILE = os.getenv('MESH_DATA_FILE', '/data/mesh_data.json')
 
 # Sample data for mesh nodes
 mesh_data = [
@@ -17,13 +21,31 @@ mesh_data = [
     {"id": "node3", "lat": 37.6879, "lon": -122.4702, "alt": 15, "connections": ["node1"]}
 ]
 
+class MeshDataHandler(FileSystemEventHandler):
+    def on_modified(self, event):
+        if event.src_path == MESH_DATA_FILE:
+            logging.info("Mesh data file changed, updating map.")
+            update_map()
+
 @app.route('/')
 def index():
+    return render_template('map.html')
 
+@app.route('/static/<path:path>')
+def send_static(path):
+    return send_from_directory('static', path)
+
+@app.route('/update_map')
+def update_map_route():
+    update_map()
+    return jsonify(success=True)
+
+def update_map():
+    global mesh_data
     # Read mesh data from a JSON file
     try:
         logging.info("Reading mesh data from file.")
-        with open('/data/mesh_data.json', 'r') as f:
+        with open(MESH_DATA_FILE, 'r') as f:
             mesh_data = json.load(f)
         logging.info(f"Mesh data: {mesh_data}")
     except FileNotFoundError:
@@ -66,7 +88,7 @@ def index():
             connected_node = next((n for n in mesh_data if n['id'] == connection), None)
             if connected_node:
                 folium.PolyLine(
-                    locations=[[node['lat'], node['lon']], [connected_node['lat'], connected_node['lon']]],
+                    locations=[[node['lat'], node['lon']], [connected_node['lat'], connected_node['lon']]], 
                     color='green'
                 ).add_to(m)
 
@@ -85,12 +107,15 @@ def index():
 
     # Save the map to an HTML file
     m.save('templates/map.html')
-    return render_template('map.html')
-
-# List directory contents
-logging.info("Listing directory contents.")
-logging.info(os.listdir())
 
 if __name__ == '__main__':
     logging.info("Starting Flask app.")
-    app.run(debug=True)
+    observer = Observer()
+    event_handler = MeshDataHandler()
+    observer.schedule(event_handler, path=os.path.dirname(MESH_DATA_FILE), recursive=False)
+    observer.start()
+    try:
+        app.run(debug=True)
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
