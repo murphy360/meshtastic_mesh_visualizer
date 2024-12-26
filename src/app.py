@@ -121,6 +121,7 @@ def monitor_data_updates():
     try:
         while True:
             time.sleep(1)
+            logging.info("Checking for mesh data updates.")
     except KeyboardInterrupt:
         observer.stop()
     observer.join()
