@@ -25,14 +25,21 @@ mesh_data = [
 
 @app.route('/')
 def index():
-    map_template = update_map()
-    return map_template
+    update_map()
+    return render_template('map.html')
 
 
 # Returns the map HTML template
 def update_map():
+    logging.info("Deleting existing map.")
+    try:
+        os.remove('templates/map.html')
+    except FileNotFoundError:
+        pass
+
     logging.info("Updating map.")
     global mesh_data
+    
     # Read mesh data from a JSON file
     try:
         logging.info("Reading mesh data from file.")
@@ -50,6 +57,7 @@ def update_map():
     # Create a map centered around the first node
     main_node = mesh_data[0]
     main_node['alt'] += 100  # Add 100 meters to the primary node's altitude
+
     logging.info(f"Creating map centered around {main_node['id']} at {main_node['lat']}, {main_node['lon']}.")
     m = folium.Map(location=[main_node['lat'], main_node['lon']], zoom_start=12)
 
@@ -110,6 +118,7 @@ def update_map():
 
     # Save the map to an HTML file
     m.save('templates/map.html')
+
     # Verify that last_updated_html is added to the map
     with open('templates/map.html') as f:
         map_template = f.read()
@@ -118,14 +127,18 @@ def update_map():
             logging.info(f"Map updated successfully. Last updated line: {line}")
             break
 
-    return render_template('map.html')
+    logging.info(render_template('map.html'))
+
+    return
 
 class MeshDataHandler(FileSystemEventHandler):
     def on_modified(self, event):
+        logging.info(f"Event type: {event.event_type}; Path: {event.src_path}")
         if event.src_path == MESH_DATA_FILE:
             logging.info("Mesh data file has changed.")
 
 def monitor_data_updates():
+    logging.info(f"Monitoring mesh data file: {MESH_DATA_FILE}")
     observer = Observer()
     event_handler = MeshDataHandler()
     observer.schedule(event_handler, path=os.path.dirname(MESH_DATA_FILE), recursive=False)
