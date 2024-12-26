@@ -12,6 +12,7 @@ from flask import Flask, render_template, make_response
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
 app = Flask(__name__)
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching of static files
 
 # Get the path to the mesh data file from the environment variable
 MESH_DATA_FILE = os.getenv('MESH_DATA_FILE', '/data/mesh_data.json')
@@ -118,22 +119,7 @@ def update_map():
     # Save the map to an HTML file
     m.save('templates/map.html')
 
-    # Verify that last_updated_html is added to the map
-    with open('templates/map.html') as f:
-        map_template = f.read()
-    for line in map_template.split('\n'):
-        if 'Last Updated' in line:
-            logging.info(f"Map updated successfully. Last updated line: {line}")
-            break
-
-    logging.info(render_template('map.html'))
-
     response = make_response(render_template('map.html'))
-    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, proxy-revalidate'
-    response.headers['Pragma'] = 'no-cache'
-    response.headers['Expires'] = '0'
-    response.headers['Surrogate-Control'] = 'no-store'
-
     return response
 
 class MeshDataHandler(FileSystemEventHandler):
