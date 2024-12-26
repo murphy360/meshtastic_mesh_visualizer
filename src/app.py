@@ -7,7 +7,7 @@ from datetime import datetime
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-from flask import Flask, render_template
+from flask import Flask, render_template, make_response
 
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
@@ -128,7 +128,13 @@ def update_map():
 
     logging.info(render_template('map.html'))
 
-    return render_template('map.html')
+    response = make_response(render_template('map.html'))
+    response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, proxy-revalidate'
+    response.headers['Pragma'] = 'no-cache'
+    response.headers['Expires'] = '0'
+    response.headers['Surrogate-Control'] = 'no-store'
+
+    return response
 
 class MeshDataHandler(FileSystemEventHandler):
     def on_modified(self, event):
