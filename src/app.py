@@ -98,6 +98,7 @@ def index():
 
     # Save the map to an HTML file
     m.save('templates/map.html')
+    return render_template('map.html')
 
 if __name__ == '__main__':
     logging.info("Starting Flask app.")
