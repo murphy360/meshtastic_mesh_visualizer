@@ -110,7 +110,7 @@ def update_map():
 
     # Save the map to an HTML file
     m.save('templates/map.html')
-    return render_template('templates/map.html')
+    return render_template('map.html')
 
 class MeshDataHandler(FileSystemEventHandler):
     def on_modified(self, event):
