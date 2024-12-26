@@ -2,10 +2,9 @@ import json
 import logging
 import os
 import folium
+from datetime import datetime
 
-from flask import Flask, render_template, jsonify, send_from_directory
-from watchdog.observers import Observer
-from watchdog.events import FileSystemEventHandler
+from flask import Flask, render_template
 
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
@@ -21,27 +20,8 @@ mesh_data = [
     {"id": "node3", "lat": 37.6879, "lon": -122.4702, "alt": 15, "connections": ["node1"]}
 ]
 
-class MeshDataHandler(FileSystemEventHandler):
-    def on_modified(self, event):
-        if event.src_path == MESH_DATA_FILE:
-            logging.info("Mesh data file changed, updating map.")
-            update_map()
-
 @app.route('/')
 def index():
-    return render_template('map.html')
-
-@app.route('/static/<path:path>')
-def send_static(path):
-    return send_from_directory('static', path)
-
-@app.route('/update_map')
-def update_map_route():
-    update_map()
-    return jsonify(success=True)
-
-def update_map():
-    global mesh_data
     # Read mesh data from a JSON file
     try:
         logging.info("Reading mesh data from file.")
@@ -105,17 +85,20 @@ def update_map():
     """
     m.get_root().html.add_child(folium.Element(key_html))
 
+    # Add a "Last Updated" label to the map
+    last_updated = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    last_updated_html = f"""
+    <div style="position: fixed; 
+                bottom: 10px; left: 50px; width: 200px; height: 30px; 
+                background-color: white; border:2px solid grey; z-index:9999; font-size:14px;">
+        &nbsp;Last Updated: {last_updated}
+    </div>
+    """
+    m.get_root().html.add_child(folium.Element(last_updated_html))
+
     # Save the map to an HTML file
     m.save('templates/map.html')
 
 if __name__ == '__main__':
     logging.info("Starting Flask app.")
-    observer = Observer()
-    event_handler = MeshDataHandler()
-    observer.schedule(event_handler, path=os.path.dirname(MESH_DATA_FILE), recursive=False)
-    observer.start()
-    try:
-        app.run(debug=True)
-    except KeyboardInterrupt:
-        observer.stop()
-    observer.join()
+    app.run(debug=True)
