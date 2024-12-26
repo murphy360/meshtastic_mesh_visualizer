@@ -110,6 +110,14 @@ def update_map():
 
     # Save the map to an HTML file
     m.save('templates/map.html')
+    # Verify that last_updated_html is added to the map
+    with open('templates/map.html') as f:
+        map_template = f.read()
+    for line in map_template.split('\n'):
+        if 'Last Updated' in line:
+            logging.info(f"Map updated successfully. Last updated line: {line}")
+            break
+
     return render_template('map.html')
 
 class MeshDataHandler(FileSystemEventHandler):
