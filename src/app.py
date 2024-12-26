@@ -117,9 +117,10 @@ def update_map():
     m.get_root().html.add_child(folium.Element(last_updated_html))
 
     # Save the map to an HTML file
-    m.save('templates/map.html')
+    unique_map_filename = f"map_{datetime.now().strftime('%Y%m%d%H%M%S')}.html"
+    m.save(f"templates/{unique_map_filename}")
 
-    response = make_response(render_template('map.html'))
+    response = render_template(unique_map_filename)
     return response
 
 class MeshDataHandler(FileSystemEventHandler):
