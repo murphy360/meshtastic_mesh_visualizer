@@ -33,7 +33,8 @@ def index():
 def update_map():
     logging.info("Deleting existing map.")
     try:
-        os.remove('templates/map.html')
+        # remove the existing map files based on a regex pattern
+        os.remove('templates/map_*.html')
     except FileNotFoundError:
         pass
 
