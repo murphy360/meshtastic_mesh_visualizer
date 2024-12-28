@@ -110,7 +110,7 @@ def update_map():
     m.get_root().html.add_child(folium.Element(key_html))
 
     # Add a "Last Updated" label to the map
-    last_updated = datetime.now().strftime('%Y-%m-%d %H:%M')
+    last_updated = mesh_data.get("last_update", "N/A")
     logging.info(f"Adding last updated label to the map. Last updated: {last_updated}")
     last_updated_html = f"""
     <div style="position: fixed; 
