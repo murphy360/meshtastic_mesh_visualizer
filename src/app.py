@@ -14,11 +14,10 @@ logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 app = Flask(__name__)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching of static files
 
-# Get the path to the mesh data file from the environment variable
 MESH_DATA_FILE = os.getenv('MESH_DATA_FILE', '/data/mesh_data.json')
 
 # Sample .json data for mesh nodes
-mesh_data = {
+DEFAULT_MESH_DATA = {
     "last_update": "2024-04-23T00:00:00Z",
     "nodes": [
         {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "connections": ["node2", "node3"]},
@@ -27,66 +26,45 @@ mesh_data = {
     ]
 }
 
+mesh_data = DEFAULT_MESH_DATA
+
 @app.route('/')
 def index():
     return update_map()
 
-# Returns the map HTML template
-def update_map():
-    logging.info("Deleting existing map.")
-    try:
-        # remove the existing map files based on a regex pattern
-        os.remove('templates/map_*.html')
-    except FileNotFoundError:
-        pass
-
-    logging.info("Updating map.")
+def read_mesh_data():
     global mesh_data
-    
-    # Read mesh data from a JSON file
     try:
         logging.info("Reading mesh data from file.")
         with open(MESH_DATA_FILE, 'r') as f:
             mesh_data = json.load(f)
         logging.info(f"Mesh data: {mesh_data}")
     except FileNotFoundError:
-        mesh_data = {
-            "last_update": "2024-04-23T00:00:00Z",
-            "nodes": [
-                {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "connections": ["node2", "node3"]},
-                {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "connections": ["node1"]},
-                {"id": "node3", "lat": 37.6879, "lon": -122.4702, "alt": 15, "connections": ["node1"]}
-            ]
-        }
+        logging.warning(f"Mesh data file not found. Using default data.")
+        mesh_data = DEFAULT_MESH_DATA
 
-    # Create a map centered around the first node
+def create_map():
     main_node = mesh_data["nodes"][0]
     main_node['alt'] += 100  # Add 100 meters to the primary node's altitude
 
     logging.info(f"Creating map centered around {main_node['id']} at {main_node['lat']}, {main_node['lon']}.")
     m = folium.Map(location=[main_node['lat'], main_node['lon']], zoom_start=12)
 
-    # Add non-primary nodes to the map first
-    for i, node in enumerate(mesh_data["nodes"][1:], start=1):
-        if not node['connections']:
-            icon = folium.Icon(color='red', icon='exclamation-sign', prefix='glyphicon')  # Node with no connections
-        else:
-            icon = folium.Icon(color='blue')
+    for node in mesh_data["nodes"][1:]:
+        icon = folium.Icon(color='red', icon='exclamation-sign', prefix='glyphicon') if not node['connections'] else folium.Icon(color='blue')
         folium.Marker(
             location=[node['lat'], node['lon']],
             popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m",
             icon=icon
         ).add_to(m)
 
-    # Add the primary node last
-    icon = folium.Icon(color='green', icon='star', prefix='fa')  # Primary node with a star icon
+    icon = folium.Icon(color='green', icon='star', prefix='fa')
     folium.Marker(
         location=[main_node['lat'], main_node['lon']],
         popup=f"Node ID: {main_node['id']}<br>Altitude: {main_node['alt']}m",
         icon=icon
     ).add_to(m)
 
-    # Draw lines between direct connections
     for node in mesh_data["nodes"]:
         for connection in node['connections']:
             connected_node = next((n for n in mesh_data["nodes"] if n['id'] == connection), None)
@@ -96,7 +74,12 @@ def update_map():
                     color='green'
                 ).add_to(m)
 
-    # Add a key to the map
+    add_map_key(m)
+    add_last_updated_label(m)
+
+    return m
+
+def add_map_key(m):
     key_html = """
     <div style="position: fixed; 
                 bottom: 50px; left: 50px; width: 150px; height: 90px; 
@@ -109,7 +92,7 @@ def update_map():
     """
     m.get_root().html.add_child(folium.Element(key_html))
 
-    # Add a "Last Updated" label to the map
+def add_last_updated_label(m):
     last_updated = mesh_data.get("last_update", "N/A")
     logging.info(f"Adding last updated label to the map. Last updated: {last_updated}")
     last_updated_html = f"""
@@ -121,7 +104,18 @@ def update_map():
     """
     m.get_root().html.add_child(folium.Element(last_updated_html))
 
-    # Save the map to an HTML file
+def delete_old_maps():
+    logging.info("Deleting existing map.")
+    try:
+        os.remove('templates/map_*.html')
+    except FileNotFoundError:
+        pass
+
+def update_map():
+    delete_old_maps()
+    read_mesh_data()
+    m = create_map()
+
     unique_map_filename = f"map_{datetime.now().strftime('%Y%m%d%H%M%S')}.html"
     m.save(f"templates/{unique_map_filename}")
 
