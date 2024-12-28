@@ -6,3 +6,5 @@ services:
       - 5000:5000
     volumes:
       - ~/mesh-monitor/data:/data
+    environment:
+      - MESH_DATA_FILE=/data/mesh_data.json

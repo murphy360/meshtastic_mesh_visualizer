@@ -1,47 +1,73 @@
 import json
 import logging
 import os
+import time
 import folium
+from datetime import datetime
+from watchdog.observers import Observer
+from watchdog.events import FileSystemEventHandler
 
-
-from flask import Flask, render_template
+from flask import Flask, render_template, make_response
 
 logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
 
 app = Flask(__name__)
+app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching of static files
 
-# Sample data for mesh nodes
-mesh_data = [
-    {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "connections": ["node2", "node3"]},
-    {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "connections": ["node1"]},
-    {"id": "node3", "lat": 37.6879, "lon": -122.4702, "alt": 15, "connections": ["node1"]}
-]
+# Get the path to the mesh data file from the environment variable
+MESH_DATA_FILE = os.getenv('MESH_DATA_FILE', '/data/mesh_data.json')
+
+# Sample .json data for mesh nodes
+mesh_data = {
+    "last_update": "2024-04-23T00:00:00Z",
+    "nodes": [
+        {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "connections": ["node2", "node3"]},
+        {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "connections": ["node1"]},
+        {"id": "node3", "lat": 37.6879, "lon": -122.4702, "alt": 15, "connections": ["node1"]}
+    ]
+}
 
 @app.route('/')
 def index():
+    return update_map()
 
+# Returns the map HTML template
+def update_map():
+    logging.info("Deleting existing map.")
+    try:
+        # remove the existing map files based on a regex pattern
+        os.remove('templates/map_*.html')
+    except FileNotFoundError:
+        pass
+
+    logging.info("Updating map.")
+    global mesh_data
+    
     # Read mesh data from a JSON file
     try:
         logging.info("Reading mesh data from file.")
-        with open('/data/mesh_data.json', 'r') as f:
+        with open(MESH_DATA_FILE, 'r') as f:
             mesh_data = json.load(f)
         logging.info(f"Mesh data: {mesh_data}")
     except FileNotFoundError:
-        print("File not found. Using sample data.")
-        mesh_data = [
-            {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "connections": ["node2", "node3"]},
-            {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "connections": ["node1"]},
-            {"id": "node3", "lat": 37.6879, "lon": -122.4702, "alt": 15, "connections": ["node1"]}
-        ]
+        mesh_data = {
+            "last_update": "2024-04-23T00:00:00Z",
+            "nodes": [
+                {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "connections": ["node2", "node3"]},
+                {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "connections": ["node1"]},
+                {"id": "node3", "lat": 37.6879, "lon": -122.4702, "alt": 15, "connections": ["node1"]}
+            ]
+        }
 
     # Create a map centered around the first node
-    main_node = mesh_data[0]
+    main_node = mesh_data["nodes"][0]
     main_node['alt'] += 100  # Add 100 meters to the primary node's altitude
+
     logging.info(f"Creating map centered around {main_node['id']} at {main_node['lat']}, {main_node['lon']}.")
     m = folium.Map(location=[main_node['lat'], main_node['lon']], zoom_start=12)
 
     # Add non-primary nodes to the map first
-    for i, node in enumerate(mesh_data[1:], start=1):
+    for i, node in enumerate(mesh_data["nodes"][1:], start=1):
         if not node['connections']:
             icon = folium.Icon(color='red', icon='exclamation-sign', prefix='glyphicon')  # Node with no connections
         else:
@@ -61,9 +87,9 @@ def index():
     ).add_to(m)
 
     # Draw lines between direct connections
-    for node in mesh_data:
+    for node in mesh_data["nodes"]:
         for connection in node['connections']:
-            connected_node = next((n for n in mesh_data if n['id'] == connection), None)
+            connected_node = next((n for n in mesh_data["nodes"] if n['id'] == connection), None)
             if connected_node:
                 folium.PolyLine(
                     locations=[[node['lat'], node['lon']], [connected_node['lat'], connected_node['lon']]],
@@ -83,14 +109,47 @@ def index():
     """
     m.get_root().html.add_child(folium.Element(key_html))
 
-    # Save the map to an HTML file
-    m.save('templates/map.html')
-    return render_template('map.html')
+    # Add a "Last Updated" label to the map
+    last_updated = mesh_data.get("last_update", "N/A")
+    logging.info(f"Adding last updated label to the map. Last updated: {last_updated}")
+    last_updated_html = f"""
+    <div style="position: fixed; 
+                bottom: 10px; left: 50px; width: 250px; height: 30px; 
+                background-color: white; border:2px solid grey; z-index:9999; font-size:14px; white-space: nowrap;">
+        &nbsp;Last Updated: {last_updated}
+    </div>
+    """
+    m.get_root().html.add_child(folium.Element(last_updated_html))
 
-# List directory contents
-logging.info("Listing directory contents.")
-logging.info(os.listdir())
+    # Save the map to an HTML file
+    unique_map_filename = f"map_{datetime.now().strftime('%Y%m%d%H%M%S')}.html"
+    m.save(f"templates/{unique_map_filename}")
+
+    response = render_template(unique_map_filename)
+    return response
+
+class MeshDataHandler(FileSystemEventHandler):
+    def on_modified(self, event):
+        logging.info(f"Event type: {event.event_type}; Path: {event.src_path}")
+        if event.src_path == MESH_DATA_FILE:
+            logging.info("Mesh data file has changed.")
+
+def monitor_data_updates():
+    logging.info(f"Monitoring mesh data file: {MESH_DATA_FILE}")
+    observer = Observer()
+    event_handler = MeshDataHandler()
+    observer.schedule(event_handler, path=os.path.dirname(MESH_DATA_FILE), recursive=False)
+    observer.start()
+    try:
+        while True:
+            time.sleep(10)  # Refresh data every 10 seconds
+            logging.info("Checking for mesh data updates.")
+            update_map()
+    except KeyboardInterrupt:
+        observer.stop()
+    observer.join()
 
 if __name__ == '__main__':
     logging.info("Starting Flask app.")
+    monitor_data_updates()
     app.run(debug=True)
