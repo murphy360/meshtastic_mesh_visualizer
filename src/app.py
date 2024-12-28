@@ -17,20 +17,19 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching of static files
 # Get the path to the mesh data file from the environment variable
 MESH_DATA_FILE = os.getenv('MESH_DATA_FILE', '/data/mesh_data.json')
 
-# Sample data for mesh nodes
-mesh_data = [
-last_update: "2024-04-23T00:00:00Z",
-nodes: [
-    {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "connections": ["node2", "node3"]},
-    {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "connections": ["node1"]},
-    {"id": "node3", "lat": 37.6879, "lon": -122.4702, "alt": 15, "connections": ["node1"]}
+# Sample .json data for mesh nodes
+mesh_data = {
+    "last_update": "2024-04-23T00:00:00Z",
+    "nodes": [
+        {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "connections": ["node2", "node3"]},
+        {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "connections": ["node1"]},
+        {"id": "node3", "lat": 37.6879, "lon": -122.4702, "alt": 15, "connections": ["node1"]}
     ]
-]
+}
 
 @app.route('/')
 def index():
     return update_map()
-
 
 # Returns the map HTML template
 def update_map():
@@ -51,15 +50,14 @@ def update_map():
             mesh_data = json.load(f)
         logging.info(f"Mesh data: {mesh_data}")
     except FileNotFoundError:
-        print("File not found. Using sample data.")
-        mesh_data = [
-        last_update: "2024-04-23T00:00:00Z",
-        nodes: [
-            {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "connections": ["node2", "node3"]},
-            {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "connections": ["node1"]},
-            {"id": "node3", "lat": 37.6879, "lon": -122.4702, "alt": 15, "connections": ["node1"]}
-        ]
-        ]
+        mesh_data = {
+            "last_update": "2024-04-23T00:00:00Z",
+            "nodes": [
+                {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "connections": ["node2", "node3"]},
+                {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "connections": ["node1"]},
+                {"id": "node3", "lat": 37.6879, "lon": -122.4702, "alt": 15, "connections": ["node1"]}
+            ]
+        }
 
     # Create a map centered around the first node
     main_node = mesh_data["nodes"][0]
@@ -94,7 +92,7 @@ def update_map():
             connected_node = next((n for n in mesh_data["nodes"] if n['id'] == connection), None)
             if connected_node:
                 folium.PolyLine(
-                    locations=[[node['lat'], node['lon']], [connected_node['lat'], connected_node['lon']]], 
+                    locations=[[node['lat'], node['lon']], [connected_node['lat'], connected_node['lon']]],
                     color='green'
                 ).add_to(m)
 
