@@ -23,6 +23,15 @@ DEFAULT_MESH_DATA = {
         {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "connections": ["node2", "node3"]},
         {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "connections": ["node1"]},
         {"id": "node3", "lat": 37.6879, "lon": -122.4702, "alt": 15, "connections": ["node1"]}
+    ],
+    "sitrep": [
+        "CQ CQ CQ de DPMM.  My 1801Z 15 Feb 2025 SITREP is as follows:", 
+        "Line 1: Direct Nodes online: 5 ( DP00 DPBP DPST DPBS DPTT)", 
+        "Line 2: Aircraft Tracks: ", "Line 3: Nodes of Interest: ", 
+        "Line 4: Packets Received: 1", 
+        "Line 5: Uptime: 15 Days, 21 Hours, 45 Minutes, 33 Seconds. Reconnections: 1", 
+        "Line 6: Intentions: Continue to track and report. Send 'Ping' to test connectivity. Send 'Sitrep' to request a report", 
+        "de DPMM out"
     ]
 }
 
@@ -76,6 +85,7 @@ def create_map():
 
     add_map_key(m)
     add_last_updated_label(m)
+    add_sitrep_data(m)
 
     return m
 
@@ -103,6 +113,18 @@ def add_last_updated_label(m):
     </div>
     """
     m.get_root().html.add_child(folium.Element(last_updated_html))
+
+def add_sitrep_data(m):
+    sitrep_html = """
+    <div style="position: fixed; 
+                top: 10px; right: 10px; width: 300px; height: auto; 
+                background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
+        <b>SITREP Data:</b><br>
+    """
+    for line in mesh_data["sitrep"]:
+        sitrep_html += f"&nbsp;{line}<br>"
+    sitrep_html += "</div>"
+    m.get_root().html.add_child(folium.Element(sitrep_html))
 
 def delete_old_maps():
     logging.info("Deleting existing map.")
