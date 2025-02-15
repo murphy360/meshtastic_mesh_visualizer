@@ -3,7 +3,7 @@ import logging
 import os
 import time
 import folium
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -59,9 +59,25 @@ def create_map():
     logging.info(f"Creating map centered around {main_node['id']} at {main_node['lat']}, {main_node['lon']}.")
     m = folium.Map(location=[main_node['lat'], main_node['lon']], zoom_start=12)
 
+    now = datetime.now(timezone.utc)
+    one_day_ago = now - timedelta(days=1)
+    one_week_ago = now - timedelta(weeks=1)
+
     for node in mesh_data["nodes"][1:]:
         last_heard = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S') if node['lastHeard'] else "N/A"
-        icon = folium.Icon(color='red', icon='exclamation-sign', prefix='glyphicon') if not node['connections'] else folium.Icon(color='blue')
+        last_heard_time = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc) if node['lastHeard'] else None
+
+        if last_heard_time:
+            if last_heard_time > one_day_ago:
+                color = 'blue'
+            elif last_heard_time > one_week_ago:
+                color = 'orange'
+            else:
+                color = 'red'
+        else:
+            color = 'red'
+
+        icon = folium.Icon(color=color, icon='exclamation-sign', prefix='glyphicon') if not node['connections'] else folium.Icon(color=color)
         folium.Marker(
             location=[node['lat'], node['lon']],
             popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard}",
