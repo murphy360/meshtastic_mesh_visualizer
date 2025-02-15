@@ -80,7 +80,7 @@ def create_map():
         icon = folium.Icon(color=color)
         folium.Marker(
             location=[node['lat'], node['lon']],
-            popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard}",
+            popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard}<br>Hops Away: {node.get('hopsAway', 'N/A')}",
             icon=icon
         ).add_to(m)
 
