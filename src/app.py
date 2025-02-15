@@ -77,7 +77,7 @@ def create_map():
         else:
             color = 'red'
 
-        icon = folium.Icon(color=color, icon='exclamation-sign', prefix='glyphicon') if not node['connections'] else folium.Icon(color=color)
+        icon = folium.Icon(color=color)
         folium.Marker(
             location=[node['lat'], node['lon']],
             popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard}",
@@ -109,12 +109,13 @@ def create_map():
 def add_map_key(m):
     key_html = """
     <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 150px; height: 90px; 
+                bottom: 50px; left: 50px; width: 200px; height: 120px; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px;">
         &nbsp;<b>Key</b><br>
         &nbsp;<i class="fa fa-star" style="color:green"></i>&nbsp;Primary Node<br>
-        &nbsp;<i class="glyphicon glyphicon-exclamation-sign" style="color:red"></i>&nbsp;No Connections<br>
-        &nbsp;<i class="fa fa-map-marker" style="color:blue"></i>&nbsp;Connected Node
+        &nbsp;<i class="fa fa-map-marker" style="color:blue"></i>&nbsp;Seen in Last Day<br>
+        &nbsp;<i class="fa fa-map-marker" style="color:orange"></i>&nbsp;Seen in Last Week<br>
+        &nbsp;<i class="fa fa-map-marker" style="color:red"></i>&nbsp;Seen Over a Week Ago
     </div>
     """
     m.get_root().html.add_child(folium.Element(key_html))
