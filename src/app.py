@@ -3,7 +3,7 @@ import logging
 import os
 import time
 import folium
-from datetime import datetime
+from datetime import datetime, timezone
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
@@ -20,9 +20,9 @@ MESH_DATA_FILE = os.getenv('MESH_DATA_FILE', '/data/mesh_data.json')
 DEFAULT_MESH_DATA = {
     "last_update": "2024-04-23T00:00:00Z",
     "nodes": [
-        {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "connections": ["node2", "node3"]},
-        {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "connections": ["node1"]},
-        {"id": "node3", "lat": 37.6879, "lon": -122.4702, "alt": 15, "connections": ["node1"]}
+        {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "lastHeard": "", "connections": ["node2", "node3"]},
+        {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "lastHeard": "1739400886",  "connections": ["node1"]},
+        {"id": "node3", "lat": 37.6879, "lon": -122.4702, "alt": 15, "lastHeard": "1739400960",  "connections": ["node1"]}
     ],
     "sitrep": [
         "CQ CQ CQ de DPMM.  My 1801Z 15 Feb 2025 SITREP is as follows:", 
@@ -60,10 +60,11 @@ def create_map():
     m = folium.Map(location=[main_node['lat'], main_node['lon']], zoom_start=12)
 
     for node in mesh_data["nodes"][1:]:
+        last_heard = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S') if node['lastHeard'] else "N/A"
         icon = folium.Icon(color='red', icon='exclamation-sign', prefix='glyphicon') if not node['connections'] else folium.Icon(color='blue')
         folium.Marker(
             location=[node['lat'], node['lon']],
-            popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m",
+            popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard}",
             icon=icon
         ).add_to(m)
 
