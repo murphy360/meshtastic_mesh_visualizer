@@ -23,7 +23,7 @@ DEFAULT_MESH_DATA = {
     "nodes": [
         {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "lastHeard": "", "connections": ["node2", "node3"]},
         {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "lastHeard": "1739400886",  "connections": ["node1"]},
-        {"id": "node3", "lat": 37.6879, "lon": -122.4702, "alt": 15, "lastHeard": "1739400960",  "connections": ["node1"]}
+        {"id": "node3", "lat": "None", "lon": "None", "alt": "None", "lastHeard": "1739400960",  "connections": ["node1"]}
     ],
     "sitrep": [
         "CQ CQ CQ de DPMM.  My 1801Z 15 Feb 2025 SITREP is as follows:", 
@@ -64,7 +64,13 @@ def create_map():
     one_day_ago = now - timedelta(days=1)
     one_week_ago = now - timedelta(weeks=1)
 
+    nodes_without_position = []
+
     for node in mesh_data["nodes"][1:]:
+        if node['lat'] == "None" or node['lon'] == "None":
+            nodes_without_position.append(node['id'])
+            continue
+
         last_heard = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S') if node['lastHeard'] else "N/A"
         last_heard_time = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc) if node['lastHeard'] else None
 
@@ -104,6 +110,7 @@ def create_map():
     add_map_key(m)
     add_last_updated_label(m)
     add_sitrep_data(m)
+    add_nodes_without_position(m, nodes_without_position)
 
     return m
 
@@ -145,6 +152,18 @@ def add_sitrep_data(m):
         sitrep_html += f"&nbsp;{line}<br>"
     sitrep_html += "</div>"
     m.get_root().html.add_child(folium.Element(sitrep_html))
+
+def add_nodes_without_position(m, nodes_without_position):
+    nodes_html = """
+    <div style="position: fixed; 
+                bottom: 10px; right: 10px; width: 300px; height: auto; 
+                background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
+        <b>Nodes Without Position Data:</b><br>
+    """
+    for node_id in nodes_without_position:
+        nodes_html += f"&nbsp;{node_id}<br>"
+    nodes_html += "</div>"
+    m.get_root().html.add_child(folium.Element(nodes_html))
 
 def delete_old_maps():
     logging.info("Deleting existing map.")
