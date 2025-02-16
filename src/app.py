@@ -101,9 +101,11 @@ def create_map():
     ).add_to(m)
 
     for node in mesh_data["nodes"]:
+        if node['lat'] == 0 or node['lon'] == 0:
+            continue
         for connection in node['connections']:
             connected_node = next((n for n in mesh_data["nodes"] if n['id'] == connection), None)
-            if connected_node:
+            if connected_node and connected_node['lat'] != 0 and connected_node['lon'] != 0:
                 folium.PolyLine(
                     locations=[[node['lat'], node['lon']], [connected_node['lat'], connected_node['lon']]],
                     color='green'
