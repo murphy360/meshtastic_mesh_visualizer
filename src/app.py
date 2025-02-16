@@ -100,6 +100,7 @@ def create_map():
         else:
             color = COLOR_NO_LAST_HEARD
 
+        logging.info(f"Adding marker for {node['id']} at {node['lat']}, {node['lon']} with color {color}.")
         icon = folium.Icon(color=color)
         folium.Marker(
             location=[node['lat'], node['lon']],
