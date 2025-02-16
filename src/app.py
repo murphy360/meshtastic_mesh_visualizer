@@ -19,6 +19,7 @@ MESH_DATA_FILE = os.getenv('MESH_DATA_FILE', '/data/mesh_data.json')
 # Sample .json data for mesh nodes
 DEFAULT_MESH_DATA = {
     "last_update": "2024-04-23T00:00:00Z",
+    "sitrep_time": "2024-04-23T00:00:00Z",
     "nodes": [
         {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "lastHeard": "", "connections": ["node2", "node3"]},
         {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "lastHeard": "1739400886",  "connections": ["node1"]},
@@ -133,11 +134,12 @@ def add_last_updated_label(m):
     m.get_root().html.add_child(folium.Element(last_updated_html))
 
 def add_sitrep_data(m):
-    sitrep_html = """
+    sitrep_time = mesh_data.get("sitrep_time", "N/A")
+    sitrep_html = f"""
     <div style="position: fixed; 
                 top: 10px; right: 10px; width: 300px; height: auto; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
-        <b>SITREP Data:</b><br>
+        <b>{sitrep_time} SITREP:</b><br>
     """
     for line in mesh_data["sitrep"]:
         sitrep_html += f"&nbsp;{line}<br>"
