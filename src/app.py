@@ -55,6 +55,7 @@ def read_mesh_data():
 
 def create_map():
     main_node = mesh_data["nodes"][0]
+    logging.info(f"Main node: {main_node}")
     main_node['alt'] += 100  # Add 100 meters to the primary node's altitude
 
     logging.info(f"Creating map centered around {main_node['id']} at {main_node['lat']}, {main_node['lon']}.")
