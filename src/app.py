@@ -75,11 +75,6 @@ def create_map():
     nodes_without_position = []
 
     for node in mesh_data["nodes"][1:]:
-        logging.info(f"Checking {node['id']} for null position data.")
-        if node['lat'] == 0 or node['lon'] == 0:
-            logging.warning(f"Node {node['id']} does not have position data.")
-            nodes_without_position.append(node['id'])
-            continue
 
         if node['lastHeard']:
             logging.info(f"Node {node['id']} was last heard at {node['lastHeard']}")
@@ -93,6 +88,7 @@ def create_map():
         if last_heard_time:
             if last_heard_time > one_day_ago:
                 color = COLOR_SEEN_LAST_DAY
+                
             elif last_heard_time > one_week_ago:
                 color = COLOR_SEEN_LAST_WEEK
             else:
@@ -100,13 +96,19 @@ def create_map():
         else:
             color = COLOR_NO_LAST_HEARD
 
-        logging.info(f"Adding marker for {node['id']} at {node['lat']}, {node['lon']} with color {color}.")
-        icon = folium.Icon(color=color)
-        folium.Marker(
-            location=[node['lat'], node['lon']],
-            popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard}<br>Hops Away: {node.get('hopsAway', 'N/A')}",
-            icon=icon
-        ).add_to(m)
+        node['color'] = color
+
+        if node['lat'] == 0 or node['lon'] == 0:
+            logging.warning(f"Node {node['id']} does not have position data.")
+            nodes_without_position.append(node)
+        else:
+            logging.info(f"Adding marker for {node['id']} at {node['lat']}, {node['lon']} with color {color}.")
+            icon = folium.Icon(color=color)
+            folium.Marker(
+                location=[node['lat'], node['lon']],
+                popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard}<br>Hops Away: {node.get('hopsAway', 'N/A')}",
+                icon=icon
+            ).add_to(m)
 
     icon = folium.Icon(color=COLOR_PRIMARY_NODE, icon='star', prefix='fa')
     folium.Marker(
@@ -180,8 +182,9 @@ def add_nodes_without_position(m, nodes_without_position):
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
         <b>Nodes Without Position Data:</b><br>
     """
-    for node_id in nodes_without_position:
-        nodes_html += f"&nbsp;{node_id}<br>"
+    for node in nodes_without_position:
+        color = node['color']
+        nodes_html += f"&nbsp;<i class='fa fa-map-marker' style='color:{color}'></i>&nbsp;{node['id']}<br>"
     nodes_html += "</div>"
     m.get_root().html.add_child(folium.Element(nodes_html))
 
