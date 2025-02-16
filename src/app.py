@@ -47,6 +47,7 @@ mesh_data = DEFAULT_MESH_DATA
 
 @app.route('/')
 def index():
+    logging.info("Request received for index.")
     return update_map()
 
 def read_mesh_data():
