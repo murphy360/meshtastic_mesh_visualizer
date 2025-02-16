@@ -67,7 +67,9 @@ def create_map():
     nodes_without_position = []
 
     for node in mesh_data["nodes"][1:]:
+        logging.info(f"Checking {node['id']} for null position data.")
         if node['lat'] == "None" or node['lon'] == "None":
+            logging.warning(f"Node {node['id']} does not have position data.")
             nodes_without_position.append(node['id'])
             continue
 
