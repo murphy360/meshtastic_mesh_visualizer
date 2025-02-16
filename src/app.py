@@ -16,6 +16,13 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching of static files
 
 MESH_DATA_FILE = os.getenv('MESH_DATA_FILE', '/data/mesh_data.json')
 
+# Define color variables
+COLOR_PRIMARY_NODE = 'green'
+COLOR_SEEN_LAST_DAY = '#007bff'
+COLOR_SEEN_LAST_WEEK = '#fd7e14'
+COLOR_SEEN_OVER_WEEK = '#6c757d'
+COLOR_NO_LAST_HEARD = '#dc3545'
+
 # Sample .json data for mesh nodes
 DEFAULT_MESH_DATA = {
     "last_update": "2024-04-23T00:00:00Z",
@@ -79,13 +86,13 @@ def create_map():
 
         if last_heard_time:
             if last_heard_time > one_day_ago:
-                color = 'blue'
+                color = COLOR_SEEN_LAST_DAY
             elif last_heard_time > one_week_ago:
-                color = 'orange'
+                color = COLOR_SEEN_LAST_WEEK
             else:
-                color = 'red'
+                color = COLOR_SEEN_OVER_WEEK
         else:
-            color = 'red'
+            color = COLOR_NO_LAST_HEARD
 
         icon = folium.Icon(color=color)
         folium.Marker(
@@ -94,7 +101,7 @@ def create_map():
             icon=icon
         ).add_to(m)
 
-    icon = folium.Icon(color='green', icon='star', prefix='fa')
+    icon = folium.Icon(color=COLOR_PRIMARY_NODE, icon='star', prefix='fa')
     folium.Marker(
         location=[main_node['lat'], main_node['lon']],
         popup=f"Node ID: {main_node['id']}<br>Altitude: {main_node['alt']}m",
@@ -122,13 +129,14 @@ def create_map():
 def add_map_key(m, primary_node_id):
     key_html = f"""
     <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 200px; height: 120px; 
+                bottom: 50px; left: 50px; width: 200px; height: 140px; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px;">
         &nbsp;<b>Key</b><br>
-        &nbsp;<i class="fa fa-star" style="color:green"></i>&nbsp;{primary_node_id}<br>
-        &nbsp;<i class="fa fa-map-marker" style="color:blue"></i>&nbsp;Seen in Last Day<br>
-        &nbsp;<i class="fa fa-map-marker" style="color:orange"></i>&nbsp;Seen in Last Week<br>
-        &nbsp;<i class="fa fa-map-marker" style="color:red"></i>&nbsp;Seen Over a Week Ago
+        &nbsp;<i class="fa fa-star" style="color:{COLOR_PRIMARY_NODE}"></i>&nbsp;{primary_node_id}<br>
+        &nbsp;<i class="fa fa-map-marker" style="color:{COLOR_SEEN_LAST_DAY}"></i>&nbsp;Seen in Last Day<br>
+        &nbsp;<i class="fa fa-map-marker" style="color:{COLOR_SEEN_LAST_WEEK}"></i>&nbsp;Seen in Last Week<br>
+        &nbsp;<i class="fa fa-map-marker" style="color:{COLOR_SEEN_OVER_WEEK}"></i>&nbsp;Seen Over a Week Ago<br>
+        &nbsp;<i class="fa fa-map-marker" style="color:{COLOR_NO_LAST_HEARD}"></i>&nbsp;No Last Heard
     </div>
     """
     m.get_root().html.add_child(folium.Element(key_html))
