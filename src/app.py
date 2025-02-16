@@ -111,20 +111,20 @@ def create_map():
                     color='green'
                 ).add_to(m)
 
-    add_map_key(m)
+    add_map_key(m, main_node['id'])
     add_last_updated_label(m)
     add_sitrep_data(m)
     add_nodes_without_position(m, nodes_without_position)
 
     return m
 
-def add_map_key(m):
-    key_html = """
+def add_map_key(m, primary_node_id):
+    key_html = f"""
     <div style="position: fixed; 
                 bottom: 50px; left: 50px; width: 200px; height: 120px; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px;">
         &nbsp;<b>Key</b><br>
-        &nbsp;<i class="fa fa-star" style="color:green"></i>&nbsp;Primary Node<br>
+        &nbsp;<i class="fa fa-star" style="color:green"></i>&nbsp;{primary_node_id}<br>
         &nbsp;<i class="fa fa-map-marker" style="color:blue"></i>&nbsp;Seen in Last Day<br>
         &nbsp;<i class="fa fa-map-marker" style="color:orange"></i>&nbsp;Seen in Last Week<br>
         &nbsp;<i class="fa fa-map-marker" style="color:red"></i>&nbsp;Seen Over a Week Ago
