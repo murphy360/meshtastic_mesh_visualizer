@@ -30,7 +30,7 @@ DEFAULT_MESH_DATA = {
     "nodes": [
         {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "lastHeard": "", "connections": ["node2", "node3"]},
         {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "lastHeard": "1739400886",  "connections": ["node1"]},
-        {"id": "node3", "lat": "None", "lon": "None", "alt": "None", "lastHeard": "1739400960",  "connections": ["node1"]}
+        {"id": "node3", "lat": 0, "lon": 0, "alt": 0, "lastHeard": "1739400960",  "connections": ["node1"]}
     ],
     "sitrep": [
         "CQ CQ CQ de DPMM.  My 1801Z 15 Feb 2025 SITREP is as follows:", 
