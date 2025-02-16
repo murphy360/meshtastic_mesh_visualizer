@@ -18,10 +18,10 @@ MESH_DATA_FILE = os.getenv('MESH_DATA_FILE', '/data/mesh_data.json')
 
 # Define color variables
 COLOR_PRIMARY_NODE = 'green'
-COLOR_SEEN_LAST_DAY = '#007bff'
-COLOR_SEEN_LAST_WEEK = '#fd7e14'
-COLOR_SEEN_OVER_WEEK = '#6c757d'
-COLOR_NO_LAST_HEARD = '#dc3545'
+COLOR_SEEN_LAST_DAY = 'blue'
+COLOR_SEEN_LAST_WEEK = 'orange'
+COLOR_SEEN_OVER_WEEK = 'gray'
+COLOR_NO_LAST_HEARD = 'red'
 
 # Sample .json data for mesh nodes
 DEFAULT_MESH_DATA = {
