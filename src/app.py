@@ -81,9 +81,15 @@ def create_map():
             nodes_without_position.append(node['id'])
             continue
 
-        last_heard = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S') if node['lastHeard'] else "N/A"
-        last_heard_time = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc) if node['lastHeard'] else None
-
+        if node['lastHeard']:
+            logging.info(f"Node {node['id']} was last heard at {node['lastHeard']}")
+            last_heard = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
+            last_heard_time = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc)
+        else:
+            logging.warning(f"Node {node['id']} has no last heard data.")
+            last_heard = "N/A"
+            last_heard_time = None
+            
         if last_heard_time:
             if last_heard_time > one_day_ago:
                 color = COLOR_SEEN_LAST_DAY
