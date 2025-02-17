@@ -185,7 +185,8 @@ def add_nodes_without_position(m, nodes_without_position):
     """
     for node in nodes_without_position:
         color = node['color']
-        nodes_html += f"&nbsp;<i class='fa fa-map-marker' style='color:{color}'></i>&nbsp;{node['id']} - Hops Away: {node['hopsAway']}<br>"
+        hops_away_text = f" - Hops Away: {node['hopsAway']}" if node['hopsAway'] != -1 else ""
+        nodes_html += f"&nbsp;<i class='fa fa-map-marker' style='color:{color}'></i>&nbsp;{node['id']}{hops_away_text}<br>"
     nodes_html += "</div>"
     m.get_root().html.add_child(folium.Element(nodes_html))
 
