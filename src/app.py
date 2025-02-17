@@ -9,7 +9,8 @@ from watchdog.events import FileSystemEventHandler
 
 from flask import Flask, render_template, make_response
 
-logging.basicConfig(format='%(asctime)s - %(message)s', level=logging.INFO)
+# Configure logging
+logging.basicConfig(format='%(asctime)s - %(filename)s:%(lineno)d - %(message)s', level=logging.INFO)
 
 app = Flask(__name__)
 app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching of static files
