@@ -79,11 +79,11 @@ def create_map():
     for node in mesh_data["nodes"][1:]:
 
         if node['lastHeard']:
-            logging.info(f"Node {node['id']} was last heard at {node['lastHeard']}")
+            #logging.info(f"Node {node['id']} was last heard at {node['lastHeard']}")
             last_heard = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
             last_heard_time = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc)
         else:
-            logging.warning(f"Node {node['id']} has no last heard data.")
+            #logging.warning(f"Node {node['id']} has no last heard data.")
             last_heard = "N/A"
             last_heard_time = None
             
@@ -101,10 +101,10 @@ def create_map():
         node['color'] = color
 
         if node['lat'] == 0 or node['lon'] == 0:
-            logging.warning(f"Node {node['id']} does not have position data.")
+            #logging.warning(f"Node {node['id']} does not have position data.")
             nodes_without_position.append(node)
         else:
-            logging.info(f"Adding marker for {node['id']} at {node['lat']}, {node['lon']} with color {color}.")
+            #logging.info(f"Adding marker for {node['id']} at {node['lat']}, {node['lon']} with color {color}.")
             icon = folium.Icon(color=color)
             folium.Marker(
                 location=[node['lat'], node['lon']],
