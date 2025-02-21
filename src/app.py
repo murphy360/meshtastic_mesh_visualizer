@@ -99,6 +99,7 @@ def create_map():
             color = COLOR_NO_LAST_HEARD
 
         node['color'] = color
+        node['last_heard_str'] = last_heard
 
         if node['lat'] == 0 or node['lon'] == 0:
             #logging.warning(f"Node {node['id']} does not have position data.")
@@ -178,17 +179,40 @@ def add_sitrep_data(m):
     m.get_root().html.add_child(folium.Element(sitrep_html))
 
 def add_nodes_without_position(m, nodes_without_position):
+    nodes_without_position.sort(key=lambda x: (x['last_heard_str'] == "N/A", x['last_heard_str']), reverse=True)
     nodes_html = """
     <div style="position: fixed; 
                 bottom: 10px; right: 10px; width: 300px; height: 200px; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px; overflow-y: scroll;">
         <b>Nodes Without Position Data:</b><br>
+        <table style="width: 100%; border-collapse: collapse;">
+            <thead>
+                <tr>
+                    <th style="border: 1px solid black; padding: 5px;">Icon</th>
+                    <th style="border: 1px solid black; padding: 5px;">ID</th>
+                    <th style="border: 1px solid black; padding: 5px;">Last Heard</th>
+                    <th style="border: 1px solid black; padding: 5px;">Connections</th>
+                </tr>
+            </thead>
+            <tbody>
     """
     for node in nodes_without_position:
         color = node['color']
         hops_away_text = f" - Hops Away: {node['hopsAway']}" if node['hopsAway'] != -1 else ""
-        nodes_html += f"&nbsp;<i class='fa fa-map-marker' style='color:{color}'></i>&nbsp;{node['id']}{hops_away_text}<br>"
-    nodes_html += "</div>"
+        connections = ", ".join(node['connections'])
+        nodes_html += f"""
+            <tr>
+                <td style="border: 1px solid black; padding: 5px;"><i class='fa fa-map-marker' style='color:{color}'></i></td>
+                <td style="border: 1px solid black; padding: 5px;">{node['id']}{hops_away_text}</td>
+                <td style="border: 1px solid black; padding: 5px;">{node['last_heard_str']}</td>
+                <td style="border: 1px solid black; padding: 5px;">{connections}</td>
+            </tr>
+        """
+    nodes_html += """
+            </tbody>
+        </table>
+    </div>
+    """
     m.get_root().html.add_child(folium.Element(nodes_html))
 
 def delete_old_maps():
