@@ -180,8 +180,8 @@ def add_sitrep_data(m):
 def add_nodes_without_position(m, nodes_without_position):
     nodes_html = """
     <div style="position: fixed; 
-                bottom: 10px; right: 10px; width: 300px; height: auto; 
-                background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
+                bottom: 10px; right: 10px; width: 300px; height: 200px; 
+                background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px; overflow-y: scroll;">
         <b>Nodes Without Position Data:</b><br>
     """
     for node in nodes_without_position:
