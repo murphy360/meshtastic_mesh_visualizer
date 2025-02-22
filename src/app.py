@@ -62,6 +62,25 @@ def read_mesh_data():
         logging.warning(f"Mesh data file not found. Using default data.")
         mesh_data = DEFAULT_MESH_DATA
 
+def time_since_last_heard(last_heard_time):
+    now = datetime.now(timezone.utc)
+    delta = now - last_heard_time
+    seconds = delta.total_seconds()
+    if seconds < 60: # Less than a minute, return seconds
+        return f"{int(seconds)}s"
+    elif seconds < 3600: # Less than an hour, return minutes
+        return f"{int(seconds // 60)}m"
+    elif seconds < 86400: # Less than a day, return hours
+        return f"{int(seconds // 3600)}h"
+    elif seconds < 604800: # Less than a week, return days
+        return f"{int(seconds // 86400)}d"
+    elif seconds < 2592000: # Less than a month, return weeks
+        return f"{int(seconds // 604800)}w"
+    elif seconds < 31536000: # Less than a year, return months
+        return f"{int(seconds // 2592000)}m"
+    else: # More than a year, return years
+        return f"{int(seconds // 31536000)}y"
+
 def create_map():
     main_node = mesh_data["nodes"][0]
     logging.info(f"Main node: {main_node}")
@@ -80,8 +99,8 @@ def create_map():
 
         if node['lastHeard']:
             #logging.info(f"Node {node['id']} was last heard at {node['lastHeard']}")
-            last_heard = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc).strftime('%Y-%m-%d %H:%M:%S')
             last_heard_time = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc)
+            last_heard = time_since_last_heard(last_heard_time)
         else:
             #logging.warning(f"Node {node['id']} has no last heard data.")
             last_heard = "N/A"
@@ -193,7 +212,7 @@ def add_nodes_without_position(m, nodes_without_position):
                     <tr>
                         <th style="border: 1px solid black; padding: 5px;">Icon</th>
                         <th style="border: 1px solid black; padding: 5px;">ID</th>
-                        <th style="border: 1px solid black; padding: 5px;">Last Heard</th>
+                        <th style="border: 1px solid black; padding: 5px;">Heard</th>
                         <th style="border: 1px solid black; padding: 5px;">Hops</th>
                         <th style="border: 1px solid black; padding: 5px;">Connections</th>
                     </tr>
