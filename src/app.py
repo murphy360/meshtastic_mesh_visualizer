@@ -119,6 +119,7 @@ def create_map():
 
         node['color'] = color
         node['last_heard_str'] = last_heard
+        node['last_heard_time'] = last_heard_time
 
         if node['lat'] == 0 or node['lon'] == 0:
             #logging.warning(f"Node {node['id']} does not have position data.")
@@ -199,7 +200,7 @@ def add_sitrep_data(m):
     m.get_root().html.add_child(folium.Element(sitrep_html))
 
 def add_nodes_without_position(m, nodes_without_position):
-    nodes_without_position.sort(key=lambda x: (x['last_heard_str'] == "N/A", -datetime.strptime(x['last_heard_str'], '%Y-%m-%d %H:%M:%S').timestamp() if x['last_heard_str'] != "N/A" else float('inf'), -x['hopsAway']))
+    nodes_without_position.sort(key=lambda x: (x['last_heard_str'] == "N/A", x['last_heard_time'] if x['last_heard_time'] else datetime.min, -x['hopsAway']))
     nodes_html = """
     <div id="nodes_without_position" style="position: fixed; 
                 bottom: 10px; right: 10px; width: 400px; height: 200px; 
