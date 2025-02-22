@@ -168,9 +168,10 @@ def add_last_updated_label(m):
 def add_sitrep_data(m):
     sitrep_time = mesh_data.get("sitrep_time", "N/A")
     sitrep_html = f"""
-    <div style="position: fixed; 
+    <div id="sitrep" style="position: fixed; 
                 top: 10px; right: 10px; width: 300px; height: auto; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
+        <button onclick="document.getElementById('sitrep').style.display='none'">Minimize</button>
         <b>{sitrep_time} SITREP:</b><br>
     """
     for line in mesh_data["sitrep"][1:-1]:  # Exclude the first and last lines
@@ -181,9 +182,10 @@ def add_sitrep_data(m):
 def add_nodes_without_position(m, nodes_without_position):
     nodes_without_position.sort(key=lambda x: (x['last_heard_str'] == "N/A", x['last_heard_str'], -x['hopsAway']))
     nodes_html = """
-    <div style="position: fixed; 
-                bottom: 10px; right: 10px; width: 300px; height: 200px; 
+    <div id="nodes_without_position" style="position: fixed; 
+                bottom: 10px; right: 10px; width: 400px; height: 200px; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
+        <button onclick="document.getElementById('nodes_without_position').style.display='none'">Minimize</button>
         <b>Nodes Without Position Data:</b><br>
         <div style="overflow-y: scroll; height: 150px;">
             <table style="width: 100%; border-collapse: collapse;">
