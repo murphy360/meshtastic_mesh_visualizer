@@ -183,36 +183,38 @@ def add_nodes_without_position(m, nodes_without_position):
     nodes_html = """
     <div style="position: fixed; 
                 bottom: 10px; right: 10px; width: 300px; height: 200px; 
-                background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px; overflow-y: scroll;">
+                background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
         <b>Nodes Without Position Data:</b><br>
-        <table style="width: 100%; border-collapse: collapse;">
-            <thead>
-                <tr>
-                    <th style="border: 1px solid black; padding: 5px;">Icon</th>
-                    <th style="border: 1px solid black; padding: 5px;">ID</th>
-                    <th style="border: 1px solid black; padding: 5px;">Last Heard</th>
-                    <th style="border: 1px solid black; padding: 5px;">Connections</th>
-                    <th style="border: 1px solid black; padding: 5px;">Hops</th>
-                </tr>
-            </thead>
-            <tbody>
+        <div style="overflow-y: scroll; height: 150px;">
+            <table style="width: 100%; border-collapse: collapse;">
+                <thead>
+                    <tr>
+                        <th style="border: 1px solid black; padding: 5px;">Icon</th>
+                        <th style="border: 1px solid black; padding: 5px;">ID</th>
+                        <th style="border: 1px solid black; padding: 5px;">Last Heard</th>
+                        <th style="border: 1px solid black; padding: 5px;">Connections</th>
+                        <th style="border: 1px solid black; padding: 5px;">Hops</th>
+                    </tr>
+                </thead>
+                <tbody>
     """
     for node in nodes_without_position:
         color = node['color']
         hops_away_text = f"{node['hopsAway']}" if node['hopsAway'] != -1 else "N/A"
         connections = ", ".join(node['connections'])
         nodes_html += f"""
-            <tr>
-                <td style="border: 1px solid black; padding: 5px;"><i class='fa fa-map-marker' style='color:{color}'></i></td>
-                <td style="border: 1px solid black; padding: 5px;">{node['id']}</td>
-                <td style="border: 1px solid black; padding: 5px;">{node['last_heard_str']}</td>
-                <td style="border: 1px solid black; padding: 5px;">{connections}</td>
-                <td style="border: 1px solid black; padding: 5px;">{hops_away_text}</td>
-            </tr>
+                    <tr>
+                        <td style="border: 1px solid black; padding: 5px;"><i class='fa fa-map-marker' style='color:{color}'></i></td>
+                        <td style="border: 1px solid black; padding: 5px;">{node['id']}</td>
+                        <td style="border: 1px solid black; padding: 5px;">{node['last_heard_str']}</td>
+                        <td style="border: 1px solid black; padding: 5px;">{connections}</td>
+                        <td style="border: 1px solid black; padding: 5px;">{hops_away_text}</td>
+                    </tr>
         """
     nodes_html += """
-            </tbody>
-        </table>
+                </tbody>
+            </table>
+        </div>
     </div>
     """
     m.get_root().html.add_child(folium.Element(nodes_html))
