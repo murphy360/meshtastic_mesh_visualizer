@@ -173,7 +173,7 @@ def add_sitrep_data(m):
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
         <b>{sitrep_time} SITREP:</b><br>
     """
-    for line in mesh_data["sitrep"]:
+    for line in mesh_data["sitrep"][1:-1]:  # Exclude the first and last lines
         sitrep_html += f"&nbsp;{line}<br>"
     sitrep_html += "</div>"
     m.get_root().html.add_child(folium.Element(sitrep_html))
