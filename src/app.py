@@ -191,8 +191,8 @@ def add_nodes_without_position(m, nodes_without_position):
                     <tr>
                         <th style="border: 1px solid black; padding: 5px;">Icon</th>
                         <th style="border: 1px solid black; padding: 5px;">ID</th>
-                        <th style="border: 1px solid black; padding: 5px;">Last Heard</th>
                         <th style="border: 1px solid black; padding: 5px;">Connections</th>
+                        <th style="border: 1px solid black; padding: 5px;">Last Heard</th>
                         <th style="border: 1px solid black; padding: 5px;">Hops</th>
                     </tr>
                 </thead>
@@ -206,8 +206,8 @@ def add_nodes_without_position(m, nodes_without_position):
                     <tr>
                         <td style="border: 1px solid black; padding: 5px;"><i class='fa fa-map-marker' style='color:{color}'></i></td>
                         <td style="border: 1px solid black; padding: 5px;">{node['id']}</td>
-                        <td style="border: 1px solid black; padding: 5px;">{node['last_heard_str']}</td>
                         <td style="border: 1px solid black; padding: 5px;">{connections}</td>
+                        <td style="border: 1px solid black; padding: 5px;">{node['last_heard_str']}</td>
                         <td style="border: 1px solid black; padding: 5px;">{hops_away_text}</td>
                     </tr>
         """
