@@ -127,9 +127,12 @@ def create_map():
         else:
             #logging.info(f"Adding marker for {node['id']} at {node['lat']}, {node['lon']} with color {color}.")
             icon = folium.Icon(color=color)
+            popup_text = f"{node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard}"
+            if node.get('hopsAway', 0) != 0:
+                popup_text += f"<br>Hops Away: {node['hopsAway']}"
             folium.Marker(
                 location=[node['lat'], node['lon']],
-                popup=f"{node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard}<br>Hops Away: {node.get('hopsAway', 'N/A')}",
+                popup=popup_text,
                 icon=icon
             ).add_to(m)
 
