@@ -192,19 +192,21 @@ def add_nodes_without_position(m, nodes_without_position):
                     <th style="border: 1px solid black; padding: 5px;">ID</th>
                     <th style="border: 1px solid black; padding: 5px;">Last Heard</th>
                     <th style="border: 1px solid black; padding: 5px;">Connections</th>
+                    <th style="border: 1px solid black; padding: 5px;">Hops</th>
                 </tr>
             </thead>
             <tbody>
     """
     for node in nodes_without_position:
         color = node['color']
-        hops_away_text = f" - Hops Away: {node['hopsAway']}" if node['hopsAway'] != -1 else ""
+        hops_away_text = f"{node['hopsAway']}" if node['hopsAway'] != -1 else "N/A"
         connections = ", ".join(node['connections'])
         nodes_html += f"""
             <tr>
                 <td style="border: 1px solid black; padding: 5px;"><i class='fa fa-map-marker' style='color:{color}'></i></td>
-                <td style="border: 1px solid black; padding: 5px;">{node['id']}{hops_away_text}</td>
+                <td style="border: 1px solid black; padding: 5px;">{node['id']}</td>
                 <td style="border: 1px solid black; padding: 5px;">{node['last_heard_str']}</td>
+                <td style="border: 1px solid black; padding: 5px;">{hops_away_text}</td>
                 <td style="border: 1px solid black; padding: 5px;">{connections}</td>
             </tr>
         """
