@@ -179,7 +179,7 @@ def add_sitrep_data(m):
     m.get_root().html.add_child(folium.Element(sitrep_html))
 
 def add_nodes_without_position(m, nodes_without_position):
-    nodes_without_position.sort(key=lambda x: (x['last_heard_str'] == "N/A", x['last_heard_str']), reverse=True)
+    nodes_without_position.sort(key=lambda x: (x['last_heard_str'] == "N/A", x['last_heard_str'], -x['hopsAway']))
     nodes_html = """
     <div style="position: fixed; 
                 bottom: 10px; right: 10px; width: 300px; height: 200px; 
@@ -206,8 +206,8 @@ def add_nodes_without_position(m, nodes_without_position):
                 <td style="border: 1px solid black; padding: 5px;"><i class='fa fa-map-marker' style='color:{color}'></i></td>
                 <td style="border: 1px solid black; padding: 5px;">{node['id']}</td>
                 <td style="border: 1px solid black; padding: 5px;">{node['last_heard_str']}</td>
-                <td style="border: 1px solid black; padding: 5px;">{hops_away_text}</td>
                 <td style="border: 1px solid black; padding: 5px;">{connections}</td>
+                <td style="border: 1px solid black; padding: 5px;">{hops_away_text}</td>
             </tr>
         """
     nodes_html += """
