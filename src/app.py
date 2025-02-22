@@ -129,14 +129,14 @@ def create_map():
             icon = folium.Icon(color=color)
             folium.Marker(
                 location=[node['lat'], node['lon']],
-                popup=f"Node ID: {node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard}<br>Hops Away: {node.get('hopsAway', 'N/A')}",
+                popup=f"{node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard}<br>Hops Away: {node.get('hopsAway', 'N/A')}",
                 icon=icon
             ).add_to(m)
 
     icon = folium.Icon(color=COLOR_PRIMARY_NODE, icon='star', prefix='fa')
     folium.Marker(
         location=[main_node['lat'], main_node['lon']],
-        popup=f"Node ID: {main_node['id']}<br>Altitude: {main_node['alt']}m",
+        popup=f"{main_node['id']}<br>Altitude: {main_node['alt']}m",
         icon=icon
     ).add_to(m)
 
