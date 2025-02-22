@@ -200,7 +200,7 @@ def add_sitrep_data(m):
     m.get_root().html.add_child(folium.Element(sitrep_html))
 
 def add_nodes_without_position(m, nodes_without_position):
-    nodes_without_position.sort(key=lambda x: (x['last_heard_str'] == "N/A", x['last_heard_time'] if x['last_heard_time'] else datetime.min, x['hopsAway']), reverse=True)
+    nodes_without_position.sort(key=lambda x: (x['last_heard_time'] if x['last_heard_time'] else datetime.min, x['hopsAway']), reverse=True)
     nodes_html = """
     <div id="nodes_without_position" style="position: fixed; 
                 bottom: 10px; right: 10px; width: 400px; height: 200px; 
