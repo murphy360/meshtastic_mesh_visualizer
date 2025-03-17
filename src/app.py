@@ -23,6 +23,8 @@ COLOR_SEEN_LAST_DAY = 'blue'
 COLOR_SEEN_LAST_WEEK = 'orange'
 COLOR_SEEN_OVER_WEEK = 'gray'
 COLOR_NO_LAST_HEARD = 'red'
+COLOR_CONNECTION_DEFAULT = 'green'
+COLOR_CONNECTION_NON_PRIMARY = 'gray'
 
 # Sample .json data for mesh nodes
 DEFAULT_MESH_DATA = {
@@ -149,9 +151,10 @@ def create_map():
         for connection in node['connections']:
             connected_node = next((n for n in mesh_data["nodes"] if n['id'] == connection), None)
             if connected_node and connected_node['lat'] != 0 and connected_node['lon'] != 0:
+                connection_color = COLOR_CONNECTION_DEFAULT if connection == main_node['id'] else COLOR_CONNECTION_NON_PRIMARY
                 folium.PolyLine(
                     locations=[[node['lat'], node['lon']], [connected_node['lat'], connected_node['lon']]],
-                    color='green'
+                    color=connection_color
                 ).add_to(m)
 
     add_map_key(m, main_node['id'])
