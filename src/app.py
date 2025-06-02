@@ -163,6 +163,7 @@ def create_map():
             
             # Add precision info to popup if available
             if 'precision_bits' in node:
+                logging.info(f"Node {node['id']} has precision bits: {node['precision_bits']}")
                 popup_text += f"<br>Precision: {node['precision_bits']} bits"
                 
             folium.Marker(
