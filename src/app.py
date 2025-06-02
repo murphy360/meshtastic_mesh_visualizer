@@ -94,7 +94,9 @@ def calculate_precision_radius(precision_bits):
     
     # Simplified calculation: higher precision_bits = smaller radius
     # This is a rough approximation, adjust as needed
-    if precision_bits <= 11:
+    if precision_bits == 0:
+        return 0
+    elif precision_bits <= 11:
         return 11672.736900000944 # 11 bits ~ 11km
     elif precision_bits == 12:
         return 5836.362884000802 # 12 bits ~ 5.8km
