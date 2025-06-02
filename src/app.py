@@ -25,6 +25,7 @@ COLOR_SEEN_OVER_WEEK = 'gray'
 COLOR_NO_LAST_HEARD = 'red'
 COLOR_CONNECTION_DEFAULT = 'green'
 COLOR_CONNECTION_NON_PRIMARY = 'gray'
+COLOR_PRECISION_CIRCLE = 'red'
 
 # Sample .json data for mesh nodes
 DEFAULT_MESH_DATA = {
@@ -83,6 +84,33 @@ def time_since_last_heard(last_heard_time):
     else: # More than a year, return years
         return f"{int(seconds // 31536000)}y"
 
+def calculate_precision_radius(precision_bits):
+    """
+    Calculate radius in meters based on precision_bits
+    Lower precision_bits means less precision (larger radius)
+    """
+    if precision_bits is None:
+        return None
+    
+    # Simplified calculation: higher precision_bits = smaller radius
+    # This is a rough approximation, adjust as needed
+    if precision_bits <= 11:
+        return 11672.736900000944 # 11 bits ~ 11km
+    elif precision_bits == 12:
+        return 5836.362884000802 # 12 bits ~ 5.8km
+    elif precision_bits == 13:
+        return 2918.1758760007315 # 13 bits ~ 2.9km
+    elif precision_bits == 14:
+        return 1459.0823719999053 # 14 bits ~ 1.5km
+    elif precision_bits == 15:
+        return 729.5356200010741 # 15 bits ~ 730m
+    elif precision_bits == 16:
+        return 364.7622440000765 # 16 bits ~ 365m
+    elif precision_bits <= 32: # Full precision
+        return 0    # 0m radius for full precision
+    else:
+        return 0     # 10m radius for high precision
+
 def create_map():
     main_node = mesh_data["nodes"][0]
     logging.info(f"Main node: {main_node}")
@@ -132,11 +160,29 @@ def create_map():
             popup_text = f"{node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard}"
             if node.get('hopsAway', 0) != 0:
                 popup_text += f"<br>Hops Away: {node['hopsAway']}"
+            
+            # Add precision info to popup if available
+            if 'precision_bits' in node:
+                popup_text += f"<br>Precision: {node['precision_bits']} bits"
+                
             folium.Marker(
                 location=[node['lat'], node['lon']],
                 popup=popup_text,
                 icon=icon
             ).add_to(m)
+            
+            # Add circle to represent position precision if available
+            if 'precision_bits' in node:
+                radius = calculate_precision_radius(node['precision_bits'])
+                if radius:
+                    folium.Circle(
+                        location=[node['lat'], node['lon']],
+                        radius=radius,
+                        color=COLOR_PRECISION_CIRCLE,
+                        fill=True,
+                        fill_opacity=0.1,
+                        popup=f"Position accuracy: ~{radius}m"
+                    ).add_to(m)
 
     icon = folium.Icon(color=COLOR_PRIMARY_NODE, icon='star', prefix='fa')
     folium.Marker(
@@ -144,6 +190,20 @@ def create_map():
         popup=f"{main_node['id']}<br>Altitude: {main_node['alt']}m",
         icon=icon
     ).add_to(m)
+    
+    # Add precision circle for main node if available
+    if 'precision_bits' in main_node:
+        radius = calculate_precision_radius(main_node['precision_bits'])
+        if radius:
+            if radius > 0:
+                folium.Circle(
+                    location=[main_node['lat'], main_node['lon']],
+                    radius=radius,
+                    color=COLOR_PRECISION_CIRCLE,
+                    fill=True,
+                    fill_opacity=0.1,
+                    popup=f"Position accuracy: ~{radius}m"
+                ).add_to(m)
 
     for node in mesh_data["nodes"]:
         if node['lat'] == 0 or node['lon'] == 0:
