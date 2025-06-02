@@ -108,10 +108,10 @@ def calculate_precision_radius(precision_bits):
         return 729.5356200010741 # 15 bits ~ 730m
     elif precision_bits == 16:
         return 364.7622440000765 # 16 bits ~ 365m
-    elif precision_bits <= 32: # Full precision
-        return 0    # 0m radius for full precision
+    elif precision_bits == 32: # Full precision
+        return 0    # No radius for full precision
     else:
-        return 0     # 10m radius for high precision
+        return 0    
 
 def create_map():
     main_node = mesh_data["nodes"][0]
@@ -178,14 +178,15 @@ def create_map():
             if 'precision_bits' in node:
                 radius = calculate_precision_radius(node['precision_bits'])
                 if radius:
-                    folium.Circle(
-                        location=[node['lat'], node['lon']],
-                        radius=radius,
-                        color=COLOR_PRECISION_CIRCLE,
-                        fill=True,
-                        fill_opacity=0.1,
-                        popup=f"Position accuracy: ~{radius}m"
-                    ).add_to(m)
+                    if radius > 0:  
+                        folium.Circle(
+                            location=[node['lat'], node['lon']],
+                            radius=radius,
+                            color=COLOR_PRECISION_CIRCLE,
+                            fill=True,
+                            fill_opacity=0.1,
+                            popup=f"Position accuracy: ~{radius}m"
+                        ).add_to(m)
 
     icon = folium.Icon(color=COLOR_PRIMARY_NODE, icon='star', prefix='fa')
     folium.Marker(
