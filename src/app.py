@@ -176,6 +176,7 @@ def create_map():
             
             # Add circle to represent position precision if available
             if 'precision_bits' in node:
+                popup_text = f"{node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard} \n Precision: {node['precision_bits']} bits"
                 radius = calculate_precision_radius(node['precision_bits'])
                 if radius:
                     if radius > 0:  
@@ -185,7 +186,7 @@ def create_map():
                             color=COLOR_PRECISION_CIRCLE,
                             fill=True,
                             fill_opacity=0.1,
-                            popup=f"Position accuracy: ~{radius}m"
+                            popup=popup_text
                         ).add_to(m)
 
     icon = folium.Icon(color=COLOR_PRIMARY_NODE, icon='star', prefix='fa')
@@ -197,6 +198,7 @@ def create_map():
     
     # Add precision circle for main node if available
     if 'precision_bits' in main_node:
+        popup_text = f"{main_node['id']}<br>Altitude: {main_node['alt']}m<br>Precision: {main_node['precision_bits']} bits"
         radius = calculate_precision_radius(main_node['precision_bits'])
         if radius:
             if radius > 0:
@@ -206,7 +208,7 @@ def create_map():
                     color=COLOR_PRECISION_CIRCLE,
                     fill=True,
                     fill_opacity=0.1,
-                    popup=f"Position accuracy: ~{radius}m"
+                    popup=popup_text
                 ).add_to(m)
 
     for node in mesh_data["nodes"]:
