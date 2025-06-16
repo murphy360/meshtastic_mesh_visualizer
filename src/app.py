@@ -18,7 +18,8 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching of static files
 MESH_DATA_FILE = os.getenv('MESH_DATA_FILE', '/data/mesh_data.json')
 
 # Define color variables
-COLOR_PRIMARY_NODE = 'green'
+COLOR_PRIMARY_NODE = 'white'
+COLOR_SEEN_LAST_HOUR = 'green'
 COLOR_SEEN_LAST_DAY = 'blue'
 COLOR_SEEN_LAST_WEEK = 'orange'
 COLOR_SEEN_OVER_WEEK = 'gray'
@@ -122,6 +123,7 @@ def create_map():
     m = folium.Map(location=[main_node['lat'], main_node['lon']], zoom_start=12)
 
     now = datetime.now(timezone.utc)
+    one_hour_ago = now - timedelta(hours=1)
     one_day_ago = now - timedelta(days=1)
     one_week_ago = now - timedelta(weeks=1)
 
@@ -139,9 +141,10 @@ def create_map():
             last_heard_time = None
             
         if last_heard_time:
-            if last_heard_time > one_day_ago:
-                color = COLOR_SEEN_LAST_DAY
-                
+            if last_heard_time > one_hour_ago:
+                color = COLOR_SEEN_LAST_HOUR
+            elif last_heard_time > one_day_ago:
+                color = COLOR_SEEN_LAST_DAY    
             elif last_heard_time > one_week_ago:
                 color = COLOR_SEEN_LAST_WEEK
             else:
@@ -178,7 +181,7 @@ def create_map():
             if 'precision_bits' in node:
                 popup_text = f"{node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard} \n Precision: {node['precision_bits']} bits"
                 radius = calculate_precision_radius(node['precision_bits'])
-                if radius:
+                if radius and last_heard_time and last_heard_time > one_day_ago:
                     if radius > 0:  
                         folium.Circle(
                             location=[node['lat'], node['lon']],
@@ -200,6 +203,7 @@ def create_map():
     if 'precision_bits' in main_node:
         popup_text = f"{main_node['id']}<br>Altitude: {main_node['alt']}m<br>Precision: {main_node['precision_bits']} bits"
         radius = calculate_precision_radius(main_node['precision_bits'])
+        # Always show precision circle for main node regardless of last heard time
         if radius:
             if radius > 0:
                 folium.Circle(
