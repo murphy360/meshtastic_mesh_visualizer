@@ -11,25 +11,14 @@ function print_section() {
     printf "***************************************************\n\n\n"
 }
 
-# Checkout to the specified branch
-print_section "Checking out to the specified branch..."
-git fetch
-git checkout $branch
-
-# Pull the latest changes from the repository
-print_section "Pulling the latest changes from the repository..."
-git pull
-
 # Stop and remove the Docker container
 print_section "Stopping and removing the Docker container..."
 docker compose down
 docker container ls -a | grep $image_name | awk '{print $1}' | xargs docker container rm
 
-# Build the Docker image
+# Build the image using the dedicated build script
 print_section "Building the Docker image..."
-docker build -t $image_name .
-docker image ls | grep $image_name
-ls -la
+./build_image.sh $branch
 
 # Run Docker Compose in detached mode
 print_section "Running Docker Compose in detached mode..."
