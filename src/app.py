@@ -183,21 +183,14 @@ def create_map():
             )
             marker.add_to(m)
             
-            # Add age data to the marker's HTML template
-            marker_html = f'''
-            <script>
-            // Add age data to the marker when it's created
-            setTimeout(function() {{
-                var markers = document.querySelectorAll('.leaflet-marker-icon');
-                var lastMarker = markers[markers.length - 1];
-                if (lastMarker) {{
-                    lastMarker.setAttribute('data-age-hours', '{age_hours}');
-                    lastMarker.classList.add('node-marker');
-                }}
-            }}, 100);
-            </script>
-            '''
-            m.get_root().html.add_child(folium.Element(marker_html))
+            # Store marker info for later age data assignment
+            if not hasattr(m, '_marker_ages'):
+                m._marker_ages = []
+            m._marker_ages.append({
+                'node_id': node['id'],
+                'age_hours': age_hours,
+                'is_primary': False
+            })
             
             # Add circle to represent position precision if available
             if 'precision_bits' in node:
@@ -222,20 +215,14 @@ def create_map():
     )
     main_marker.add_to(m)
     
-    # Add age data for main node (always age 0 since it's the primary)
-    main_marker_html = f'''
-    <script>
-    setTimeout(function() {{
-        var markers = document.querySelectorAll('.leaflet-marker-icon');
-        var lastMarker = markers[markers.length - 1];
-        if (lastMarker) {{
-            lastMarker.setAttribute('data-age-hours', '0');
-            lastMarker.classList.add('primary-node-marker');
-        }}
-    }}, 100);
-    </script>
-    '''
-    m.get_root().html.add_child(folium.Element(main_marker_html))
+    # Store main marker info for later age data assignment
+    if not hasattr(m, '_marker_ages'):
+        m._marker_ages = []
+    m._marker_ages.append({
+        'node_id': main_node['id'],
+        'age_hours': 0,
+        'is_primary': True
+    })
     
     # Add precision circle for main node if available
     if 'precision_bits' in main_node:
@@ -267,11 +254,51 @@ def create_map():
 
     add_map_key(m, main_node['id'])
     add_age_filter_slider(m)
+    add_marker_age_data(m)  # Add age data to markers
     add_last_updated_label(m)
     add_sitrep_data(m)
     add_nodes_without_position(m, nodes_without_position)
 
     return m
+
+def add_marker_age_data(m):
+    """Add age data to markers after they're created"""
+    if not hasattr(m, '_marker_ages'):
+        return
+    
+    # Create JavaScript to assign age data to markers
+    marker_data_js = """
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Wait for map to be fully loaded
+        setTimeout(function() {
+            const markerAges = """ + str(m._marker_ages).replace("'", '"').replace('True', 'true').replace('False', 'false') + """;
+            const markers = document.querySelectorAll('.leaflet-marker-icon');
+            
+            console.log('Found', markers.length, 'markers to process');
+            console.log('Marker age data:', markerAges);
+            
+            // Assign age data to markers based on their order
+            markers.forEach((marker, index) => {
+                if (index < markerAges.length) {
+                    const ageData = markerAges[index];
+                    marker.setAttribute('data-age-hours', ageData.age_hours);
+                    marker.setAttribute('data-node-id', ageData.node_id);
+                    
+                    if (ageData.is_primary) {
+                        marker.classList.add('primary-node-marker');
+                    } else {
+                        marker.classList.add('node-marker');
+                    }
+                    
+                    console.log('Assigned age data to marker', index, ':', ageData);
+                }
+            });
+        }, 500);
+    });
+    </script>
+    """
+    m.get_root().html.add_child(folium.Element(marker_data_js))
 
 def add_age_filter_slider(m):
     """Add a slider widget to filter nodes by age"""
@@ -315,9 +342,14 @@ def add_age_filter_slider(m):
                 let hiddenCount = 0;
                 let totalCount = 0;
                 
-                markers.forEach(marker => {
+                console.log(`Found ${markers.length} markers on map`); // Debug log
+                
+                markers.forEach((marker, index) => {
                     const ageHours = parseFloat(marker.getAttribute('data-age-hours') || '0');
                     const isPrimary = marker.classList.contains('primary-node-marker');
+                    const nodeId = marker.getAttribute('data-node-id') || 'unknown';
+                    
+                    console.log(`Marker ${index}: nodeId=${nodeId}, age=${ageHours}h, isPrimary=${isPrimary}`); // Debug log
                     
                     // Always show primary node
                     if (isPrimary) {
@@ -334,13 +366,15 @@ def add_age_filter_slider(m):
                     }
                 });
                 
+                console.log(`Filter applied: maxAge=${maxAgeHours}h, hidden=${hiddenCount}, total=${totalCount}`); // Debug log
+                
                 // Update display to show how many nodes are hidden
                 if (hiddenCount > 0) {
                     ageValue.textContent = updateAgeDisplay(maxAgeHours) + ` (hiding ${hiddenCount} nodes)`;
                 } else {
                     ageValue.textContent = updateAgeDisplay(maxAgeHours);
                 }
-            }, 500);
+            }, 1000); // Increased delay to ensure markers are loaded
         }
         
         slider.addEventListener('input', function() {
@@ -375,10 +409,21 @@ def add_age_filter_slider(m):
         // Initialize display
         ageValue.textContent = updateAgeDisplay(slider.value);
         
-        // Apply initial filter after a delay to ensure markers are loaded
+        // Apply initial filter after a longer delay to ensure markers are loaded
         setTimeout(function() {
+            console.log('Applying initial filter...');
             filterNodesByAge(168);
-        }, 1000);
+        }, 2000);
+        
+        // Add a test button for debugging
+        const testButton = document.createElement('button');
+        testButton.textContent = 'Test Filter';
+        testButton.style.cssText = 'margin-left: 5px; font-size: 12px;';
+        testButton.onclick = function() {
+            console.log('Manual filter test triggered');
+            filterNodesByAge(parseInt(slider.value));
+        };
+        document.getElementById('age-filter').appendChild(testButton);
     });
     </script>
     """
