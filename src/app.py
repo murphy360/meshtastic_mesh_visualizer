@@ -266,22 +266,36 @@ def add_marker_age_data(m):
     if not hasattr(m, '_marker_ages'):
         return
     
-    # Create JavaScript to assign age data to markers
+    # Create JavaScript to assign age data to markers using Leaflet events
     marker_data_js = """
     <script>
+    // Store marker age data globally
+    window.markerAgeData = """ + str(m._marker_ages).replace("'", '"').replace('True', 'true').replace('False', 'false') + """;
+    
     document.addEventListener('DOMContentLoaded', function() {
-        // Wait for map to be fully loaded
-        setTimeout(function() {
-            const markerAges = """ + str(m._marker_ages).replace("'", '"').replace('True', 'true').replace('False', 'false') + """;
+        console.log('DOM loaded, marker age data available:', window.markerAgeData);
+        
+        // Function to assign age data to markers
+        function assignAgeDataToMarkers() {
             const markers = document.querySelectorAll('.leaflet-marker-icon');
+            console.log('Found', markers.length, 'markers in DOM');
             
-            console.log('Found', markers.length, 'markers to process');
-            console.log('Marker age data:', markerAges);
+            if (markers.length === 0) {
+                console.log('No markers found, retrying in 500ms...');
+                setTimeout(assignAgeDataToMarkers, 500);
+                return;
+            }
+            
+            if (markers.length !== window.markerAgeData.length) {
+                console.log(`Marker count mismatch: DOM has ${markers.length}, data has ${window.markerAgeData.length}. Retrying...`);
+                setTimeout(assignAgeDataToMarkers, 500);
+                return;
+            }
             
             // Assign age data to markers based on their order
             markers.forEach((marker, index) => {
-                if (index < markerAges.length) {
-                    const ageData = markerAges[index];
+                if (index < window.markerAgeData.length) {
+                    const ageData = window.markerAgeData[index];
                     marker.setAttribute('data-age-hours', ageData.age_hours);
                     marker.setAttribute('data-node-id', ageData.node_id);
                     
@@ -294,7 +308,16 @@ def add_marker_age_data(m):
                     console.log('Assigned age data to marker', index, ':', ageData);
                 }
             });
-        }, 500);
+            
+            console.log('Age data assignment complete!');
+            // Trigger initial filter after assignment
+            if (typeof window.applyInitialFilter === 'function') {
+                window.applyInitialFilter();
+            }
+        }
+        
+        // Start trying to assign age data after a delay
+        setTimeout(assignAgeDataToMarkers, 1000);
     });
     </script>
     """
@@ -336,46 +359,55 @@ def add_age_filter_slider(m):
         }
         
         function filterNodesByAge(maxAgeHours) {
-            // Wait a bit for all markers to be rendered
-            setTimeout(function() {
-                const markers = document.querySelectorAll('.leaflet-marker-icon');
-                let hiddenCount = 0;
-                let totalCount = 0;
+            const markers = document.querySelectorAll('.leaflet-marker-icon');
+            let hiddenCount = 0;
+            let totalCount = 0;
+            
+            console.log(`Filtering with maxAge=${maxAgeHours}h, found ${markers.length} markers`);
+            
+            if (markers.length === 0) {
+                console.log('No markers found for filtering, retrying in 500ms...');
+                setTimeout(() => filterNodesByAge(maxAgeHours), 500);
+                return;
+            }
+            
+            markers.forEach((marker, index) => {
+                const ageHours = parseFloat(marker.getAttribute('data-age-hours') || '0');
+                const isPrimary = marker.classList.contains('primary-node-marker');
+                const nodeId = marker.getAttribute('data-node-id') || 'unknown';
                 
-                console.log(`Found ${markers.length} markers on map`); // Debug log
+                console.log(`Marker ${index}: nodeId=${nodeId}, age=${ageHours}h, isPrimary=${isPrimary}`);
                 
-                markers.forEach((marker, index) => {
-                    const ageHours = parseFloat(marker.getAttribute('data-age-hours') || '0');
-                    const isPrimary = marker.classList.contains('primary-node-marker');
-                    const nodeId = marker.getAttribute('data-node-id') || 'unknown';
-                    
-                    console.log(`Marker ${index}: nodeId=${nodeId}, age=${ageHours}h, isPrimary=${isPrimary}`); // Debug log
-                    
-                    // Always show primary node
-                    if (isPrimary) {
-                        marker.style.display = 'block';
-                        return;
-                    }
-                    
-                    totalCount++;
-                    if (maxAgeHours >= 168 || ageHours <= maxAgeHours) {
-                        marker.style.display = 'block';
-                    } else {
-                        marker.style.display = 'none';
-                        hiddenCount++;
-                    }
-                });
-                
-                console.log(`Filter applied: maxAge=${maxAgeHours}h, hidden=${hiddenCount}, total=${totalCount}`); // Debug log
-                
-                // Update display to show how many nodes are hidden
-                if (hiddenCount > 0) {
-                    ageValue.textContent = updateAgeDisplay(maxAgeHours) + ` (hiding ${hiddenCount} nodes)`;
-                } else {
-                    ageValue.textContent = updateAgeDisplay(maxAgeHours);
+                // Always show primary node
+                if (isPrimary) {
+                    marker.style.display = 'block';
+                    return;
                 }
-            }, 1000); // Increased delay to ensure markers are loaded
+                
+                totalCount++;
+                if (maxAgeHours >= 168 || ageHours <= maxAgeHours) {
+                    marker.style.display = 'block';
+                } else {
+                    marker.style.display = 'none';
+                    hiddenCount++;
+                }
+            });
+            
+            console.log(`Filter applied: maxAge=${maxAgeHours}h, hidden=${hiddenCount}, total=${totalCount}`);
+            
+            // Update display to show how many nodes are hidden
+            if (hiddenCount > 0) {
+                ageValue.textContent = updateAgeDisplay(maxAgeHours) + ` (hiding ${hiddenCount} nodes)`;
+            } else {
+                ageValue.textContent = updateAgeDisplay(maxAgeHours);
+            }
         }
+        
+        // Make function available globally for initial filter
+        window.applyInitialFilter = function() {
+            console.log('Applying initial filter...');
+            filterNodesByAge(168);
+        };
         
         slider.addEventListener('input', function() {
             const hours = parseInt(this.value);
@@ -408,12 +440,6 @@ def add_age_filter_slider(m):
         
         // Initialize display
         ageValue.textContent = updateAgeDisplay(slider.value);
-        
-        // Apply initial filter after a longer delay to ensure markers are loaded
-        setTimeout(function() {
-            console.log('Applying initial filter...');
-            filterNodesByAge(168);
-        }, 2000);
         
         // Add a test button for debugging
         const testButton = document.createElement('button');
