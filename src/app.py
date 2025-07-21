@@ -7,7 +7,7 @@ from datetime import datetime, timezone, timedelta
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-from flask import Flask, render_template, make_response
+from flask import Flask, render_template, make_response, request, jsonify
 
 # Configure logging
 logging.basicConfig(format='%(asctime)s - %(filename)s:%(lineno)d - %(message)s', level=logging.INFO)
@@ -54,6 +54,21 @@ mesh_data = DEFAULT_MESH_DATA
 def index():
     logging.info("Request received for index.")
     return update_map()
+
+@app.route('/filter_map')
+def filter_map():
+    """Create a filtered map based on age filter"""
+    max_age_hours = request.args.get('max_age_hours', 168, type=float)
+    logging.info(f"Filtering map with max age: {max_age_hours} hours")
+    
+    read_mesh_data()
+    m = create_map(max_age_hours=max_age_hours)
+    
+    unique_map_filename = f"map_filtered_{datetime.now().strftime('%Y%m%d%H%M%S')}.html"
+    m.save(f"templates/{unique_map_filename}")
+    
+    response = render_template(unique_map_filename)
+    return response
 
 def read_mesh_data():
     global mesh_data
@@ -114,12 +129,12 @@ def calculate_precision_radius(precision_bits):
     else:
         return 0    
 
-def create_map():
+def create_map(max_age_hours=168):
     main_node = mesh_data["nodes"][0]
     logging.info(f"Main node: {main_node}")
     main_node['alt'] += 100  # Add 100 meters to the primary node's altitude
 
-    logging.info(f"Creating map centered around {main_node['id']} at {main_node['lat']}, {main_node['lon']}.")
+    logging.info(f"Creating map centered around {main_node['id']} at {main_node['lat']}, {main_node['lon']} with age filter: {max_age_hours}h.")
     m = folium.Map(location=[main_node['lat'], main_node['lon']], zoom_start=12)
 
     now = datetime.now(timezone.utc)
@@ -128,17 +143,25 @@ def create_map():
     one_week_ago = now - timedelta(weeks=1)
 
     nodes_without_position = []
+    filtered_nodes_count = 0
+    total_nodes_count = 0
 
     for node in mesh_data["nodes"][1:]:
-
+        total_nodes_count += 1
+        
         if node['lastHeard']:
-            #logging.info(f"Node {node['id']} was last heard at {node['lastHeard']}")
             last_heard_time = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc)
             last_heard = time_since_last_heard(last_heard_time)
+            age_hours = (now - last_heard_time).total_seconds() / 3600
         else:
-            #logging.warning(f"Node {node['id']} has no last heard data.")
             last_heard = "N/A"
             last_heard_time = None
+            age_hours = float('inf')  # Treat nodes with no lastHeard as very old
+            
+        # Apply age filter here - skip nodes that are too old
+        if max_age_hours < 168 and age_hours > max_age_hours:
+            filtered_nodes_count += 1
+            continue
             
         if last_heard_time:
             if last_heard_time > one_hour_ago:
@@ -157,10 +180,8 @@ def create_map():
         node['last_heard_time'] = last_heard_time
 
         if node['lat'] == 0 or node['lon'] == 0:
-            #logging.warning(f"Node {node['id']} does not have position data.")
             nodes_without_position.append(node)
         else:
-            #logging.info(f"Adding marker for {node['id']} at {node['lat']}, {node['lon']} with color {color}.")
             icon = folium.Icon(color=color)
             popup_text = f"{node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard}"
             if node.get('hopsAway', 0) != 0:
@@ -170,11 +191,6 @@ def create_map():
             if 'precision_bits' in node:
                 logging.info(f"Node {node['id']} has precision bits: {node['precision_bits']}")
                 popup_text += f"<br>Precision: {node['precision_bits']} bits"
-                
-            # Calculate age in hours for filtering
-            age_hours = 0
-            if last_heard_time:
-                age_hours = (now - last_heard_time).total_seconds() / 3600
             
             marker = folium.Marker(
                 location=[node['lat'], node['lon']],
@@ -182,15 +198,6 @@ def create_map():
                 icon=icon
             )
             marker.add_to(m)
-            
-            # Store marker info for later age data assignment
-            if not hasattr(m, '_marker_ages'):
-                m._marker_ages = []
-            m._marker_ages.append({
-                'node_id': node['id'],
-                'age_hours': age_hours,
-                'is_primary': False
-            })
             
             # Add circle to represent position precision if available
             if 'precision_bits' in node:
@@ -207,6 +214,7 @@ def create_map():
                             popup=popup_text
                         ).add_to(m)
 
+    # Always add the main node (primary node)
     icon = folium.Icon(color=COLOR_PRIMARY_NODE, icon='star', prefix='fa')
     main_marker = folium.Marker(
         location=[main_node['lat'], main_node['lon']],
@@ -215,20 +223,10 @@ def create_map():
     )
     main_marker.add_to(m)
     
-    # Store main marker info for later age data assignment
-    if not hasattr(m, '_marker_ages'):
-        m._marker_ages = []
-    m._marker_ages.append({
-        'node_id': main_node['id'],
-        'age_hours': 0,
-        'is_primary': True
-    })
-    
     # Add precision circle for main node if available
     if 'precision_bits' in main_node:
         popup_text = f"{main_node['id']}<br>Altitude: {main_node['alt']}m<br>Precision: {main_node['precision_bits']} bits"
         radius = calculate_precision_radius(main_node['precision_bits'])
-        # Always show precision circle for main node regardless of last heard time
         if radius:
             if radius > 0:
                 folium.Circle(
@@ -240,12 +238,36 @@ def create_map():
                     popup=popup_text
                 ).add_to(m)
 
+    # Add connections (only for nodes that passed the filter)
     for node in mesh_data["nodes"]:
         if node['lat'] == 0 or node['lon'] == 0:
             continue
+            
+        # Check if this node passed the age filter
+        if node != main_node:  # Skip age check for main node
+            if node['lastHeard']:
+                last_heard_time = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc)
+                age_hours = (now - last_heard_time).total_seconds() / 3600
+            else:
+                age_hours = float('inf')
+            
+            if max_age_hours < 168 and age_hours > max_age_hours:
+                continue  # Skip connections for filtered out nodes
+        
         for connection in node['connections']:
             connected_node = next((n for n in mesh_data["nodes"] if n['id'] == connection), None)
             if connected_node and connected_node['lat'] != 0 and connected_node['lon'] != 0:
+                # Check if connected node also passed the filter
+                if connected_node != main_node:  # Skip age check for main node
+                    if connected_node['lastHeard']:
+                        connected_last_heard = datetime.fromtimestamp(int(connected_node['lastHeard']), tz=timezone.utc)
+                        connected_age_hours = (now - connected_last_heard).total_seconds() / 3600
+                    else:
+                        connected_age_hours = float('inf')
+                    
+                    if max_age_hours < 168 and connected_age_hours > max_age_hours:
+                        continue  # Skip connection if target node is filtered out
+                
                 connection_color = COLOR_CONNECTION_DEFAULT if connection == main_node['id'] else COLOR_CONNECTION_NON_PRIMARY
                 folium.PolyLine(
                     locations=[[node['lat'], node['lon']], [connected_node['lat'], connected_node['lon']]],
@@ -253,173 +275,93 @@ def create_map():
                 ).add_to(m)
 
     add_map_key(m, main_node['id'])
-    add_age_filter_slider(m)
-    add_marker_age_data(m)  # Add age data to markers
+    add_age_filter_slider(m, max_age_hours, filtered_nodes_count, total_nodes_count)
     add_last_updated_label(m)
     add_sitrep_data(m)
     add_nodes_without_position(m, nodes_without_position)
 
+    logging.info(f"Map created with {total_nodes_count - filtered_nodes_count} visible nodes, {filtered_nodes_count} filtered out")
     return m
 
-def add_marker_age_data(m):
-    """Add age data to markers after they're created"""
-    if not hasattr(m, '_marker_ages'):
-        return
-    
-    # Create JavaScript to assign age data to markers using Leaflet events
-    marker_data_js = """
-    <script>
-    // Store marker age data globally
-    window.markerAgeData = """ + str(m._marker_ages).replace("'", '"').replace('True', 'true').replace('False', 'false') + """;
-    
-    document.addEventListener('DOMContentLoaded', function() {
-        console.log('DOM loaded, marker age data available:', window.markerAgeData);
-        
-        // Function to assign age data to markers
-        function assignAgeDataToMarkers() {
-            const markers = document.querySelectorAll('.leaflet-marker-icon');
-            console.log('Found', markers.length, 'markers in DOM');
-            
-            if (markers.length === 0) {
-                console.log('No markers found, retrying in 500ms...');
-                setTimeout(assignAgeDataToMarkers, 500);
-                return;
-            }
-            
-            if (markers.length !== window.markerAgeData.length) {
-                console.log(`Marker count mismatch: DOM has ${markers.length}, data has ${window.markerAgeData.length}. Retrying...`);
-                setTimeout(assignAgeDataToMarkers, 500);
-                return;
-            }
-            
-            // Assign age data to markers based on their order
-            markers.forEach((marker, index) => {
-                if (index < window.markerAgeData.length) {
-                    const ageData = window.markerAgeData[index];
-                    marker.setAttribute('data-age-hours', ageData.age_hours);
-                    marker.setAttribute('data-node-id', ageData.node_id);
-                    
-                    if (ageData.is_primary) {
-                        marker.classList.add('primary-node-marker');
-                    } else {
-                        marker.classList.add('node-marker');
-                    }
-                    
-                    console.log('Assigned age data to marker', index, ':', ageData);
-                }
-            });
-            
-            console.log('Age data assignment complete!');
-            // Trigger initial filter after assignment
-            if (typeof window.applyInitialFilter === 'function') {
-                window.applyInitialFilter();
-            }
-        }
-        
-        // Start trying to assign age data after a delay
-        setTimeout(assignAgeDataToMarkers, 1000);
-    });
-    </script>
-    """
-    m.get_root().html.add_child(folium.Element(marker_data_js))
-
-def add_age_filter_slider(m):
+def add_age_filter_slider(m, current_max_age=168, filtered_count=0, total_count=0):
     """Add a slider widget to filter nodes by age"""
-    slider_html = """
+    
+    def update_age_display(hours):
+        if hours >= 168:
+            return 'All nodes (7+ days)'
+        elif hours >= 24:
+            days = int(hours // 24)
+            return f'≤ {days} day{"s" if days > 1 else ""} old'
+        elif hours >= 1:
+            return f'≤ {int(hours)} hour{"s" if hours > 1 else ""} old'
+        else:
+            return 'Real-time only'
+    
+    current_display = update_age_display(current_max_age)
+    if filtered_count > 0:
+        current_display += f' (hiding {filtered_count} nodes)'
+    
+    slider_html = f"""
     <div id="age-filter" style="position: fixed; 
-                top: 10px; left: 10px; width: 320px; height: 100px; 
+                top: 10px; left: 10px; width: 320px; height: 120px; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
         <label for="ageSlider"><b>Filter by Node Age:</b></label><br>
-        <input type="range" id="ageSlider" min="0" max="168" value="168" step="1" style="width: 220px;">
+        <input type="range" id="ageSlider" min="0" max="168" value="{current_max_age}" step="1" style="width: 220px;">
         <br>
-        <span id="ageValue">All nodes</span>
-        <button id="resetFilter" style="margin-left: 10px; font-size: 12px;">Reset</button>
+        <span id="ageValue">{current_display}</span><br>
+        <button id="resetFilter" style="margin-top: 5px; font-size: 12px;">Reset</button>
         <button id="hideFilter" style="margin-left: 5px; font-size: 12px;">Hide</button>
+        <span style="font-size: 10px; color: gray;">Showing {total_count - filtered_count}/{total_count} nodes</span>
     </div>
     
     <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function() {{
         const slider = document.getElementById('ageSlider');
         const ageValue = document.getElementById('ageValue');
         const resetButton = document.getElementById('resetFilter');
         const hideButton = document.getElementById('hideFilter');
         const filterDiv = document.getElementById('age-filter');
         
-        function updateAgeDisplay(hours) {
-            if (hours >= 168) {
+        function updateAgeDisplay(hours) {{
+            if (hours >= 168) {{
                 return 'All nodes (7+ days)';
-            } else if (hours >= 24) {
+            }} else if (hours >= 24) {{
                 const days = Math.floor(hours / 24);
-                return `≤ ${days} day${days > 1 ? 's' : ''} old`;
-            } else if (hours >= 1) {
-                return `≤ ${hours} hour${hours > 1 ? 's' : ''} old`;
-            } else {
+                return `≤ ${{days}} day${{days > 1 ? 's' : ''}} old`;
+            }} else if (hours >= 1) {{
+                return `≤ ${{hours}} hour${{hours > 1 ? 's' : ''}} old`;
+            }} else {{
                 return 'Real-time only';
-            }
-        }
+            }}
+        }}
         
-        function filterNodesByAge(maxAgeHours) {
-            const markers = document.querySelectorAll('.leaflet-marker-icon');
-            let hiddenCount = 0;
-            let totalCount = 0;
+        function applyFilter(maxAgeHours) {{
+            console.log('Applying filter with max age:', maxAgeHours, 'hours');
+            ageValue.textContent = updateAgeDisplay(maxAgeHours) + ' (loading...)';
             
-            console.log(`Filtering with maxAge=${maxAgeHours}h, found ${markers.length} markers`);
-            
-            if (markers.length === 0) {
-                console.log('No markers found for filtering, retrying in 500ms...');
-                setTimeout(() => filterNodesByAge(maxAgeHours), 500);
-                return;
-            }
-            
-            markers.forEach((marker, index) => {
-                const ageHours = parseFloat(marker.getAttribute('data-age-hours') || '0');
-                const isPrimary = marker.classList.contains('primary-node-marker');
-                const nodeId = marker.getAttribute('data-node-id') || 'unknown';
-                
-                console.log(`Marker ${index}: nodeId=${nodeId}, age=${ageHours}h, isPrimary=${isPrimary}`);
-                
-                // Always show primary node
-                if (isPrimary) {
-                    marker.style.display = 'block';
-                    return;
-                }
-                
-                totalCount++;
-                if (maxAgeHours >= 168 || ageHours <= maxAgeHours) {
-                    marker.style.display = 'block';
-                } else {
-                    marker.style.display = 'none';
-                    hiddenCount++;
-                }
-            });
-            
-            console.log(`Filter applied: maxAge=${maxAgeHours}h, hidden=${hiddenCount}, total=${totalCount}`);
-            
-            // Update display to show how many nodes are hidden
-            if (hiddenCount > 0) {
-                ageValue.textContent = updateAgeDisplay(maxAgeHours) + ` (hiding ${hiddenCount} nodes)`;
-            } else {
-                ageValue.textContent = updateAgeDisplay(maxAgeHours);
-            }
-        }
+            // Reload the page with the filter parameter
+            const url = new URL('/filter_map', window.location.origin);
+            url.searchParams.set('max_age_hours', maxAgeHours);
+            window.location.href = url.toString();
+        }}
         
-        // Make function available globally for initial filter
-        window.applyInitialFilter = function() {
-            console.log('Applying initial filter...');
-            filterNodesByAge(168);
-        };
-        
-        slider.addEventListener('input', function() {
+        // Debounce slider input to avoid too many requests
+        let sliderTimeout;
+        slider.addEventListener('input', function() {{
             const hours = parseInt(this.value);
-            filterNodesByAge(hours);
-        });
+            ageValue.textContent = updateAgeDisplay(hours) + ' (loading...)';
+            
+            clearTimeout(sliderTimeout);
+            sliderTimeout = setTimeout(() => {{
+                applyFilter(hours);
+            }}, 500); // Wait 500ms after user stops moving slider
+        }});
         
-        resetButton.addEventListener('click', function() {
-            slider.value = 168;
-            filterNodesByAge(168);
-        });
+        resetButton.addEventListener('click', function() {{
+            applyFilter(168);
+        }});
         
-        hideButton.addEventListener('click', function() {
+        hideButton.addEventListener('click', function() {{
             filterDiv.style.display = 'none';
             
             // Add a small show button
@@ -431,26 +373,13 @@ def add_age_filter_slider(m):
                 z-index: 9999; font-size: 12px; padding: 5px; 
                 cursor: pointer;
             `;
-            showButton.onclick = function() {
+            showButton.onclick = function() {{
                 filterDiv.style.display = 'block';
                 document.body.removeChild(showButton);
-            };
+            }};
             document.body.appendChild(showButton);
-        });
-        
-        // Initialize display
-        ageValue.textContent = updateAgeDisplay(slider.value);
-        
-        // Add a test button for debugging
-        const testButton = document.createElement('button');
-        testButton.textContent = 'Test Filter';
-        testButton.style.cssText = 'margin-left: 5px; font-size: 12px;';
-        testButton.onclick = function() {
-            console.log('Manual filter test triggered');
-            filterNodesByAge(parseInt(slider.value));
-        };
-        document.getElementById('age-filter').appendChild(testButton);
-    });
+        }});
+    }});
     </script>
     """
     m.get_root().html.add_child(folium.Element(slider_html))
