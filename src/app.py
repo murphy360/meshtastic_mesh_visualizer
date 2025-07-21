@@ -171,11 +171,33 @@ def create_map():
                 logging.info(f"Node {node['id']} has precision bits: {node['precision_bits']}")
                 popup_text += f"<br>Precision: {node['precision_bits']} bits"
                 
-            folium.Marker(
+            # Calculate age in hours for filtering
+            age_hours = 0
+            if last_heard_time:
+                age_hours = (now - last_heard_time).total_seconds() / 3600
+            
+            marker = folium.Marker(
                 location=[node['lat'], node['lon']],
                 popup=popup_text,
                 icon=icon
-            ).add_to(m)
+            )
+            marker.add_to(m)
+            
+            # Add age data to the marker's HTML template
+            marker_html = f'''
+            <script>
+            // Add age data to the marker when it's created
+            setTimeout(function() {{
+                var markers = document.querySelectorAll('.leaflet-marker-icon');
+                var lastMarker = markers[markers.length - 1];
+                if (lastMarker) {{
+                    lastMarker.setAttribute('data-age-hours', '{age_hours}');
+                    lastMarker.classList.add('node-marker');
+                }}
+            }}, 100);
+            </script>
+            '''
+            m.get_root().html.add_child(folium.Element(marker_html))
             
             # Add circle to represent position precision if available
             if 'precision_bits' in node:
@@ -193,11 +215,27 @@ def create_map():
                         ).add_to(m)
 
     icon = folium.Icon(color=COLOR_PRIMARY_NODE, icon='star', prefix='fa')
-    folium.Marker(
+    main_marker = folium.Marker(
         location=[main_node['lat'], main_node['lon']],
         popup=f"{main_node['id']}<br>Altitude: {main_node['alt']}m",
         icon=icon
-    ).add_to(m)
+    )
+    main_marker.add_to(m)
+    
+    # Add age data for main node (always age 0 since it's the primary)
+    main_marker_html = f'''
+    <script>
+    setTimeout(function() {{
+        var markers = document.querySelectorAll('.leaflet-marker-icon');
+        var lastMarker = markers[markers.length - 1];
+        if (lastMarker) {{
+            lastMarker.setAttribute('data-age-hours', '0');
+            lastMarker.classList.add('primary-node-marker');
+        }}
+    }}, 100);
+    </script>
+    '''
+    m.get_root().html.add_child(folium.Element(main_marker_html))
     
     # Add precision circle for main node if available
     if 'precision_bits' in main_node:
@@ -228,11 +266,123 @@ def create_map():
                 ).add_to(m)
 
     add_map_key(m, main_node['id'])
+    add_age_filter_slider(m)
     add_last_updated_label(m)
     add_sitrep_data(m)
     add_nodes_without_position(m, nodes_without_position)
 
     return m
+
+def add_age_filter_slider(m):
+    """Add a slider widget to filter nodes by age"""
+    slider_html = """
+    <div id="age-filter" style="position: fixed; 
+                top: 10px; left: 10px; width: 320px; height: 100px; 
+                background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
+        <label for="ageSlider"><b>Filter by Node Age:</b></label><br>
+        <input type="range" id="ageSlider" min="0" max="168" value="168" step="1" style="width: 220px;">
+        <br>
+        <span id="ageValue">All nodes</span>
+        <button id="resetFilter" style="margin-left: 10px; font-size: 12px;">Reset</button>
+        <button id="hideFilter" style="margin-left: 5px; font-size: 12px;">Hide</button>
+    </div>
+    
+    <script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const slider = document.getElementById('ageSlider');
+        const ageValue = document.getElementById('ageValue');
+        const resetButton = document.getElementById('resetFilter');
+        const hideButton = document.getElementById('hideFilter');
+        const filterDiv = document.getElementById('age-filter');
+        
+        function updateAgeDisplay(hours) {
+            if (hours >= 168) {
+                return 'All nodes (7+ days)';
+            } else if (hours >= 24) {
+                const days = Math.floor(hours / 24);
+                return `≤ ${days} day${days > 1 ? 's' : ''} old`;
+            } else if (hours >= 1) {
+                return `≤ ${hours} hour${hours > 1 ? 's' : ''} old`;
+            } else {
+                return 'Real-time only';
+            }
+        }
+        
+        function filterNodesByAge(maxAgeHours) {
+            // Wait a bit for all markers to be rendered
+            setTimeout(function() {
+                const markers = document.querySelectorAll('.leaflet-marker-icon');
+                let hiddenCount = 0;
+                let totalCount = 0;
+                
+                markers.forEach(marker => {
+                    const ageHours = parseFloat(marker.getAttribute('data-age-hours') || '0');
+                    const isPrimary = marker.classList.contains('primary-node-marker');
+                    
+                    // Always show primary node
+                    if (isPrimary) {
+                        marker.style.display = 'block';
+                        return;
+                    }
+                    
+                    totalCount++;
+                    if (maxAgeHours >= 168 || ageHours <= maxAgeHours) {
+                        marker.style.display = 'block';
+                    } else {
+                        marker.style.display = 'none';
+                        hiddenCount++;
+                    }
+                });
+                
+                // Update display to show how many nodes are hidden
+                if (hiddenCount > 0) {
+                    ageValue.textContent = updateAgeDisplay(maxAgeHours) + ` (hiding ${hiddenCount} nodes)`;
+                } else {
+                    ageValue.textContent = updateAgeDisplay(maxAgeHours);
+                }
+            }, 500);
+        }
+        
+        slider.addEventListener('input', function() {
+            const hours = parseInt(this.value);
+            filterNodesByAge(hours);
+        });
+        
+        resetButton.addEventListener('click', function() {
+            slider.value = 168;
+            filterNodesByAge(168);
+        });
+        
+        hideButton.addEventListener('click', function() {
+            filterDiv.style.display = 'none';
+            
+            // Add a small show button
+            const showButton = document.createElement('div');
+            showButton.innerHTML = 'Show Filter';
+            showButton.style.cssText = `
+                position: fixed; top: 10px; left: 10px; 
+                background-color: white; border: 2px solid grey; 
+                z-index: 9999; font-size: 12px; padding: 5px; 
+                cursor: pointer;
+            `;
+            showButton.onclick = function() {
+                filterDiv.style.display = 'block';
+                document.body.removeChild(showButton);
+            };
+            document.body.appendChild(showButton);
+        });
+        
+        // Initialize display
+        ageValue.textContent = updateAgeDisplay(slider.value);
+        
+        // Apply initial filter after a delay to ensure markers are loaded
+        setTimeout(function() {
+            filterNodesByAge(168);
+        }, 1000);
+    });
+    </script>
+    """
+    m.get_root().html.add_child(folium.Element(slider_html))
 
 def add_map_key(m, primary_node_id):
     key_html = f"""
@@ -265,7 +415,7 @@ def add_sitrep_data(m):
     sitrep_time = mesh_data.get("sitrep_time", "N/A")
     sitrep_html = f"""
     <div id="sitrep" style="position: fixed; 
-                top: 10px; right: 10px; width: 300px; height: auto; 
+                top: 120px; right: 10px; width: 300px; height: auto; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
         <button onclick="document.getElementById('sitrep').style.display='none'">Minimize</button>
         <b>{sitrep_time} SITREP:</b><br>
