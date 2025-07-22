@@ -18,7 +18,7 @@ app.config['SEND_FILE_MAX_AGE_DEFAULT'] = 0  # Disable caching of static files
 MESH_DATA_FILE = os.getenv('MESH_DATA_FILE', '/data/mesh_data.json')
 
 # Define color variables
-COLOR_PRIMARY_NODE = 'white'
+COLOR_PRIMARY_NODE = 'purple'
 COLOR_SEEN_LAST_HOUR = 'green'
 COLOR_SEEN_LAST_DAY = 'blue'
 COLOR_SEEN_LAST_WEEK = 'orange'
@@ -351,7 +351,7 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
     
     key_html = f"""
     <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 280px; height: 180px; 
+                bottom: 50px; left: 50px; width: 320px; height: 220px; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
         <b>Key - Click to Toggle Visibility</b><br>
         <div style="margin-top: 5px;">
@@ -377,6 +377,15 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
             <div id="toggle-no-last-heard" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_no_last_heard'])}">
                 <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_no_last_heard'])}</span>
                 <i class="fa fa-map-marker" style="color:{COLOR_NO_LAST_HEARD}"></i>&nbsp;No Last Heard ({age_group_counts['no_last_heard']})
+            </div>
+        </div>
+        <div style="margin-top: 8px; border-top: 1px solid #ccc; padding-top: 5px;">
+            <div style="margin: 2px 0; font-size: 12px;">
+                <i class="fa fa-circle-o" style="color:{COLOR_PRECISION_CIRCLE}"></i>&nbsp;Range Rings - Position Precision
+            </div>
+            <div style="font-size: 10px; color: gray; margin-left: 15px;">
+                Red circles show GPS precision uncertainty<br>
+                Shown only for nodes heard within last day
             </div>
         </div>
         <div style="margin-top: 8px; font-size: 11px; color: gray;">
