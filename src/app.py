@@ -212,14 +212,15 @@ def is_aircraft(node):
 
 def create_receive_range_polygon(nodes, main_node, visibility_settings, hop_count=0):
     """
-    Create a polygon around all nodes with specified hop count to show network range
+    Create a polygon around all nodes with hop count <= specified value to show network range
     Only includes nodes that are currently visible based on visibility settings
     
     Args:
         nodes: List of all nodes
         main_node: The primary node
         visibility_settings: Current visibility settings
-        hop_count: Number of hops away from primary node (0, 1, 2, etc.)
+        hop_count: Maximum number of hops away from primary node (0, 1, 2, etc.)
+                  Includes all nodes with hops <= this value
     """
     import math
     from datetime import datetime, timezone, timedelta
@@ -230,10 +231,11 @@ def create_receive_range_polygon(nodes, main_node, visibility_settings, hop_coun
     one_day_ago = now - timedelta(days=1)
     one_week_ago = now - timedelta(weeks=1)
     
-    # Get all nodes with specified hop count that have valid positions and are currently visible
+    # Get all nodes with hop count <= specified hop count that have valid positions and are currently visible
     hop_nodes = []
     for node in nodes:
-        if (node.get('hopsAway', -1) == hop_count and 
+        if (node.get('hopsAway', -1) <= hop_count and 
+            node.get('hopsAway', -1) >= 0 and  # Ensure valid hop count
             node['lat'] != 0 and node['lon'] != 0 and 
             node != main_node):  # Exclude the main node itself
             
@@ -257,8 +259,8 @@ def create_receive_range_polygon(nodes, main_node, visibility_settings, hop_coun
             if node_should_show:
                 hop_nodes.append([node['lat'], node['lon']])
     
-    # Include the main node in the 0-hop polygon (always visible)
-    if hop_count == 0 and main_node['lat'] != 0 and main_node['lon'] != 0:
+    # Include the main node in all polygons (always visible and always 0 hops)
+    if main_node['lat'] != 0 and main_node['lon'] != 0:
         hop_nodes.append([main_node['lat'], main_node['lon']])
     
     if len(hop_nodes) < 3:
@@ -513,7 +515,7 @@ def create_map(visibility_settings=None):
                 fill=True,
                 fillColor=COLOR_RECEIVE_RANGE,
                 fillOpacity=0.3,
-                popup="Primary Node Receive Range (0-hop nodes)"
+                popup="Direct Receive Range (0-hop nodes only)"
             ).add_to(m)
             logging.info(f"Added 0-hop receive range polygon with {len(polygon_coords)} points")
         else:
@@ -529,7 +531,7 @@ def create_map(visibility_settings=None):
                 fill=True,
                 fillColor=COLOR_RECEIVE_RANGE_1HOP,
                 fillOpacity=0.25,
-                popup="1-Hop Network Range (1-hop nodes)"
+                popup="1-Hop Network Range (0-1 hop nodes)"
             ).add_to(m)
             logging.info(f"Added 1-hop receive range polygon with {len(polygon_coords_1hop)} points")
         else:
@@ -545,7 +547,7 @@ def create_map(visibility_settings=None):
                 fill=True,
                 fillColor=COLOR_RECEIVE_RANGE_2HOP,
                 fillOpacity=0.2,
-                popup="2-Hop Network Range (2-hop nodes)"
+                popup="2-Hop Network Range (0-2 hop nodes)"
             ).add_to(m)
             logging.info(f"Added 2-hop receive range polygon with {len(polygon_coords_2hop)} points")
         else:
@@ -561,7 +563,7 @@ def create_map(visibility_settings=None):
                 fill=True,
                 fillColor=COLOR_RECEIVE_RANGE_3HOP,
                 fillOpacity=0.15,
-                popup="3-Hop Network Range (3-hop nodes)"
+                popup="3-Hop Network Range (0-3 hop nodes)"
             ).add_to(m)
             logging.info(f"Added 3-hop receive range polygon with {len(polygon_coords_3hop)} points")
         else:
@@ -618,19 +620,19 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
         <div style="margin-top: 8px; border-top: 1px solid #ccc; padding-top: 5px;">
             <div id="toggle-receive-range" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings.get('show_receive_range', False))}">
                 <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings.get('show_receive_range', False))}</span>
-                <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE}"></i>&nbsp;0-Hop Range (direct connections)
+                <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE}"></i>&nbsp;0-Hop Coverage (direct only)
             </div>
             <div id="toggle-receive-range-1hop" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings.get('show_receive_range_1hop', False))}">
                 <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings.get('show_receive_range_1hop', False))}</span>
-                <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE_1HOP}"></i>&nbsp;1-Hop Range (network reach)
+                <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE_1HOP}"></i>&nbsp;1-Hop Coverage (0-1 hops)
             </div>
             <div id="toggle-receive-range-2hop" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings.get('show_receive_range_2hop', False))}">
                 <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings.get('show_receive_range_2hop', False))}</span>
-                <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE_2HOP}"></i>&nbsp;2-Hop Range (extended reach)
+                <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE_2HOP}"></i>&nbsp;2-Hop Coverage (0-2 hops)
             </div>
             <div id="toggle-receive-range-3hop" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings.get('show_receive_range_3hop', False))}">
                 <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings.get('show_receive_range_3hop', False))}</span>
-                <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE_3HOP}"></i>&nbsp;3-Hop Range (max reach)
+                <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE_3HOP}"></i>&nbsp;3-Hop Coverage (0-3 hops)
             </div>
             <div style="margin: 2px 0; font-size: 12px;">
                 <i class="fa fa-circle-o" style="color:{COLOR_PRECISION_CIRCLE}"></i>&nbsp;Range Rings - Position Precision
