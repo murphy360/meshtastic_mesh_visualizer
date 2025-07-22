@@ -388,7 +388,7 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
     
     key_html = f"""
     <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 320px; height: 260px; 
+                bottom: 50px; left: 50px; width: 320px; height: 300px; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
         <b>Key - Click to Toggle Visibility</b><br>
         <div style="margin-top: 5px;">
