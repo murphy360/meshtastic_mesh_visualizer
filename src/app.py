@@ -57,12 +57,26 @@ def index():
 
 @app.route('/filter_map')
 def filter_map():
-    """Create a filtered map based on age filter"""
-    max_age_hours = request.args.get('max_age_hours', 168, type=float)
-    logging.info(f"Filtering map with max age: {max_age_hours} hours")
+    """Create a filtered map based on visibility toggles"""
+    # Get visibility parameters for each age group
+    show_last_hour = request.args.get('show_last_hour', 'true').lower() == 'true'
+    show_last_day = request.args.get('show_last_day', 'true').lower() == 'true'
+    show_last_week = request.args.get('show_last_week', 'true').lower() == 'true'
+    show_over_week = request.args.get('show_over_week', 'true').lower() == 'true'
+    show_no_last_heard = request.args.get('show_no_last_heard', 'true').lower() == 'true'
+    
+    visibility_settings = {
+        'show_last_hour': show_last_hour,
+        'show_last_day': show_last_day,
+        'show_last_week': show_last_week,
+        'show_over_week': show_over_week,
+        'show_no_last_heard': show_no_last_heard
+    }
+    
+    logging.info(f"Filtering map with visibility settings: {visibility_settings}")
     
     read_mesh_data()
-    m = create_map(max_age_hours=max_age_hours)
+    m = create_map(visibility_settings=visibility_settings)
     
     unique_map_filename = f"map_filtered_{datetime.now().strftime('%Y%m%d%H%M%S')}.html"
     m.save(f"templates/{unique_map_filename}")
@@ -129,12 +143,22 @@ def calculate_precision_radius(precision_bits):
     else:
         return 0    
 
-def create_map(max_age_hours=168):
+def create_map(visibility_settings=None):
+    # Default visibility settings (all visible)
+    if visibility_settings is None:
+        visibility_settings = {
+            'show_last_hour': True,
+            'show_last_day': True,
+            'show_last_week': True,
+            'show_over_week': True,
+            'show_no_last_heard': True
+        }
+    
     main_node = mesh_data["nodes"][0]
     logging.info(f"Main node: {main_node}")
     main_node['alt'] += 100  # Add 100 meters to the primary node's altitude
 
-    logging.info(f"Creating map centered around {main_node['id']} at {main_node['lat']}, {main_node['lon']} with age filter: {max_age_hours}h.")
+    logging.info(f"Creating map centered around {main_node['id']} at {main_node['lat']}, {main_node['lon']} with visibility: {visibility_settings}.")
     m = folium.Map(location=[main_node['lat'], main_node['lon']], zoom_start=12)
 
     now = datetime.now(timezone.utc)
@@ -145,6 +169,13 @@ def create_map(max_age_hours=168):
     nodes_without_position = []
     filtered_nodes_count = 0
     total_nodes_count = 0
+    age_group_counts = {
+        'last_hour': 0,
+        'last_day': 0,
+        'last_week': 0,
+        'over_week': 0,
+        'no_last_heard': 0
+    }
 
     for node in mesh_data["nodes"][1:]:
         total_nodes_count += 1
@@ -152,32 +183,44 @@ def create_map(max_age_hours=168):
         if node['lastHeard']:
             last_heard_time = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc)
             last_heard = time_since_last_heard(last_heard_time)
-            age_hours = (now - last_heard_time).total_seconds() / 3600
         else:
             last_heard = "N/A"
             last_heard_time = None
-            age_hours = float('inf')  # Treat nodes with no lastHeard as very old
             
-        # Apply age filter here - skip nodes that are too old
-        if max_age_hours < 168 and age_hours > max_age_hours:
-            filtered_nodes_count += 1
-            continue
-            
+        # Determine age group and color
         if last_heard_time:
             if last_heard_time > one_hour_ago:
                 color = COLOR_SEEN_LAST_HOUR
+                age_group = 'last_hour'
+                should_show = visibility_settings.get('show_last_hour', True)
             elif last_heard_time > one_day_ago:
-                color = COLOR_SEEN_LAST_DAY    
+                color = COLOR_SEEN_LAST_DAY
+                age_group = 'last_day'
+                should_show = visibility_settings.get('show_last_day', True)
             elif last_heard_time > one_week_ago:
                 color = COLOR_SEEN_LAST_WEEK
+                age_group = 'last_week'
+                should_show = visibility_settings.get('show_last_week', True)
             else:
                 color = COLOR_SEEN_OVER_WEEK
+                age_group = 'over_week'
+                should_show = visibility_settings.get('show_over_week', True)
         else:
             color = COLOR_NO_LAST_HEARD
+            age_group = 'no_last_heard'
+            should_show = visibility_settings.get('show_no_last_heard', True)
+
+        age_group_counts[age_group] += 1
+        
+        # Apply visibility filter - skip nodes that are hidden
+        if not should_show:
+            filtered_nodes_count += 1
+            continue
 
         node['color'] = color
         node['last_heard_str'] = last_heard
         node['last_heard_time'] = last_heard_time
+        node['age_group'] = age_group
 
         if node['lat'] == 0 or node['lon'] == 0:
             nodes_without_position.append(node)
@@ -238,35 +281,49 @@ def create_map(max_age_hours=168):
                     popup=popup_text
                 ).add_to(m)
 
-    # Add connections (only for nodes that passed the filter)
+    # Add connections (only for nodes that are visible)
     for node in mesh_data["nodes"]:
         if node['lat'] == 0 or node['lon'] == 0:
             continue
             
-        # Check if this node passed the age filter
-        if node != main_node:  # Skip age check for main node
+        # Check if this node is visible
+        if node != main_node:  # Skip visibility check for main node
             if node['lastHeard']:
                 last_heard_time = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc)
-                age_hours = (now - last_heard_time).total_seconds() / 3600
+                if last_heard_time > one_hour_ago:
+                    should_show = visibility_settings.get('show_last_hour', True)
+                elif last_heard_time > one_day_ago:
+                    should_show = visibility_settings.get('show_last_day', True)
+                elif last_heard_time > one_week_ago:
+                    should_show = visibility_settings.get('show_last_week', True)
+                else:
+                    should_show = visibility_settings.get('show_over_week', True)
             else:
-                age_hours = float('inf')
+                should_show = visibility_settings.get('show_no_last_heard', True)
             
-            if max_age_hours < 168 and age_hours > max_age_hours:
-                continue  # Skip connections for filtered out nodes
+            if not should_show:
+                continue  # Skip connections for hidden nodes
         
         for connection in node['connections']:
             connected_node = next((n for n in mesh_data["nodes"] if n['id'] == connection), None)
             if connected_node and connected_node['lat'] != 0 and connected_node['lon'] != 0:
-                # Check if connected node also passed the filter
-                if connected_node != main_node:  # Skip age check for main node
+                # Check if connected node is also visible
+                if connected_node != main_node:  # Skip visibility check for main node
                     if connected_node['lastHeard']:
                         connected_last_heard = datetime.fromtimestamp(int(connected_node['lastHeard']), tz=timezone.utc)
-                        connected_age_hours = (now - connected_last_heard).total_seconds() / 3600
+                        if connected_last_heard > one_hour_ago:
+                            connected_should_show = visibility_settings.get('show_last_hour', True)
+                        elif connected_last_heard > one_day_ago:
+                            connected_should_show = visibility_settings.get('show_last_day', True)
+                        elif connected_last_heard > one_week_ago:
+                            connected_should_show = visibility_settings.get('show_last_week', True)
+                        else:
+                            connected_should_show = visibility_settings.get('show_over_week', True)
                     else:
-                        connected_age_hours = float('inf')
+                        connected_should_show = visibility_settings.get('show_no_last_heard', True)
                     
-                    if max_age_hours < 168 and connected_age_hours > max_age_hours:
-                        continue  # Skip connection if target node is filtered out
+                    if not connected_should_show:
+                        continue  # Skip connection if target node is hidden
                 
                 connection_color = COLOR_CONNECTION_DEFAULT if connection == main_node['id'] else COLOR_CONNECTION_NON_PRIMARY
                 folium.PolyLine(
@@ -274,8 +331,7 @@ def create_map(max_age_hours=168):
                     color=connection_color
                 ).add_to(m)
 
-    add_map_key(m, main_node['id'])
-    add_age_filter_slider(m, max_age_hours, filtered_nodes_count, total_nodes_count)
+    add_interactive_map_key(m, main_node['id'], visibility_settings, age_group_counts)
     add_last_updated_label(m)
     add_sitrep_data(m)
     add_nodes_without_position(m, nodes_without_position)
@@ -283,106 +339,99 @@ def create_map(max_age_hours=168):
     logging.info(f"Map created with {total_nodes_count - filtered_nodes_count} visible nodes, {filtered_nodes_count} filtered out")
     return m
 
-def add_age_filter_slider(m, current_max_age=168, filtered_count=0, total_count=0):
-    """Add a slider widget to filter nodes by age"""
+def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_counts):
+    """Add an interactive map key with clickable visibility toggles"""
     
-    def update_age_display(hours):
-        if hours >= 168:
-            return 'All nodes (7+ days)'
-        elif hours >= 24:
-            days = int(hours // 24)
-            return f'≤ {days} day{"s" if days > 1 else ""} old'
-        elif hours >= 1:
-            return f'≤ {int(hours)} hour{"s" if hours > 1 else ""} old'
-        else:
-            return 'Real-time only'
+    # Create visibility indicators
+    def get_visibility_indicator(is_visible):
+        return "👁️" if is_visible else "❌"
     
-    current_display = update_age_display(current_max_age)
-    if filtered_count > 0:
-        current_display += f' (hiding {filtered_count} nodes)'
+    def get_opacity_style(is_visible):
+        return "opacity: 1.0;" if is_visible else "opacity: 0.5; text-decoration: line-through;"
     
-    slider_html = f"""
-    <div id="age-filter" style="position: fixed; 
-                top: 10px; left: 10px; width: 320px; height: 120px; 
+    key_html = f"""
+    <div style="position: fixed; 
+                bottom: 50px; left: 50px; width: 280px; height: 180px; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
-        <label for="ageSlider"><b>Filter by Node Age:</b></label><br>
-        <input type="range" id="ageSlider" min="0" max="168" value="{current_max_age}" step="1" style="width: 220px;">
-        <br>
-        <span id="ageValue">{current_display}</span><br>
-        <button id="resetFilter" style="margin-top: 5px; font-size: 12px;">Reset</button>
-        <button id="hideFilter" style="margin-left: 5px; font-size: 12px;">Hide</button>
-        <span style="font-size: 10px; color: gray;">Showing {total_count - filtered_count}/{total_count} nodes</span>
+        <b>Key - Click to Toggle Visibility</b><br>
+        <div style="margin-top: 5px;">
+            <div style="margin: 2px 0;">
+                <i class="fa fa-star" style="color:{COLOR_PRIMARY_NODE}"></i>&nbsp;{primary_node_id} (Always visible)
+            </div>
+            <div id="toggle-last-hour" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_last_hour'])}">
+                <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_last_hour'])}</span>
+                <i class="fa fa-map-marker" style="color:{COLOR_SEEN_LAST_HOUR}"></i>&nbsp;Last Hour ({age_group_counts['last_hour']})
+            </div>
+            <div id="toggle-last-day" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_last_day'])}">
+                <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_last_day'])}</span>
+                <i class="fa fa-map-marker" style="color:{COLOR_SEEN_LAST_DAY}"></i>&nbsp;Last Day ({age_group_counts['last_day']})
+            </div>
+            <div id="toggle-last-week" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_last_week'])}">
+                <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_last_week'])}</span>
+                <i class="fa fa-map-marker" style="color:{COLOR_SEEN_LAST_WEEK}"></i>&nbsp;Last Week ({age_group_counts['last_week']})
+            </div>
+            <div id="toggle-over-week" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_over_week'])}">
+                <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_over_week'])}</span>
+                <i class="fa fa-map-marker" style="color:{COLOR_SEEN_OVER_WEEK}"></i>&nbsp;Over Week Ago ({age_group_counts['over_week']})
+            </div>
+            <div id="toggle-no-last-heard" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_no_last_heard'])}">
+                <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_no_last_heard'])}</span>
+                <i class="fa fa-map-marker" style="color:{COLOR_NO_LAST_HEARD}"></i>&nbsp;No Last Heard ({age_group_counts['no_last_heard']})
+            </div>
+        </div>
+        <div style="margin-top: 8px; font-size: 11px; color: gray;">
+            Visible: {sum(count for key, count in age_group_counts.items() 
+                      if visibility_settings.get(f'show_{key}', True))} / {sum(age_group_counts.values())} nodes
+        </div>
     </div>
     
     <script>
     document.addEventListener('DOMContentLoaded', function() {{
-        const slider = document.getElementById('ageSlider');
-        const ageValue = document.getElementById('ageValue');
-        const resetButton = document.getElementById('resetFilter');
-        const hideButton = document.getElementById('hideFilter');
-        const filterDiv = document.getElementById('age-filter');
-        
-        function updateAgeDisplay(hours) {{
-            if (hours >= 168) {{
-                return 'All nodes (7+ days)';
-            }} else if (hours >= 24) {{
-                const days = Math.floor(hours / 24);
-                return `≤ ${{days}} day${{days > 1 ? 's' : ''}} old`;
-            }} else if (hours >= 1) {{
-                return `≤ ${{hours}} hour${{hours > 1 ? 's' : ''}} old`;
-            }} else {{
-                return 'Real-time only';
-            }}
-        }}
-        
-        function applyFilter(maxAgeHours) {{
-            console.log('Applying filter with max age:', maxAgeHours, 'hours');
-            ageValue.textContent = updateAgeDisplay(maxAgeHours) + ' (loading...)';
+        function toggleVisibility(group, currentState) {{
+            console.log('Toggling visibility for group:', group, 'current state:', currentState);
             
-            // Reload the page with the filter parameter
+            // Build URL with toggled state
             const url = new URL('/filter_map', window.location.origin);
-            url.searchParams.set('max_age_hours', maxAgeHours);
+            const newState = !currentState;
+            
+            // Set all current visibility states
+            url.searchParams.set('show_last_hour', '{str(visibility_settings["show_last_hour"]).lower()}');
+            url.searchParams.set('show_last_day', '{str(visibility_settings["show_last_day"]).lower()}');
+            url.searchParams.set('show_last_week', '{str(visibility_settings["show_last_week"]).lower()}');
+            url.searchParams.set('show_over_week', '{str(visibility_settings["show_over_week"]).lower()}');
+            url.searchParams.set('show_no_last_heard', '{str(visibility_settings["show_no_last_heard"]).lower()}');
+            
+            // Toggle the specific group
+            url.searchParams.set('show_' + group, newState.toString());
+            
+            console.log('Navigating to:', url.toString());
             window.location.href = url.toString();
         }}
         
-        // Debounce slider input to avoid too many requests
-        let sliderTimeout;
-        slider.addEventListener('input', function() {{
-            const hours = parseInt(this.value);
-            ageValue.textContent = updateAgeDisplay(hours) + ' (loading...)';
-            
-            clearTimeout(sliderTimeout);
-            sliderTimeout = setTimeout(() => {{
-                applyFilter(hours);
-            }}, 500); // Wait 500ms after user stops moving slider
+        // Add click listeners
+        document.getElementById('toggle-last-hour').addEventListener('click', function() {{
+            toggleVisibility('last_hour', {str(visibility_settings['show_last_hour']).lower()});
         }});
         
-        resetButton.addEventListener('click', function() {{
-            applyFilter(168);
+        document.getElementById('toggle-last-day').addEventListener('click', function() {{
+            toggleVisibility('last_day', {str(visibility_settings['show_last_day']).lower()});
         }});
         
-        hideButton.addEventListener('click', function() {{
-            filterDiv.style.display = 'none';
-            
-            // Add a small show button
-            const showButton = document.createElement('div');
-            showButton.innerHTML = 'Show Filter';
-            showButton.style.cssText = `
-                position: fixed; top: 10px; left: 10px; 
-                background-color: white; border: 2px solid grey; 
-                z-index: 9999; font-size: 12px; padding: 5px; 
-                cursor: pointer;
-            `;
-            showButton.onclick = function() {{
-                filterDiv.style.display = 'block';
-                document.body.removeChild(showButton);
-            }};
-            document.body.appendChild(showButton);
+        document.getElementById('toggle-last-week').addEventListener('click', function() {{
+            toggleVisibility('last_week', {str(visibility_settings['show_last_week']).lower()});
+        }});
+        
+        document.getElementById('toggle-over-week').addEventListener('click', function() {{
+            toggleVisibility('over_week', {str(visibility_settings['show_over_week']).lower()});
+        }});
+        
+        document.getElementById('toggle-no-last-heard').addEventListener('click', function() {{
+            toggleVisibility('no_last_heard', {str(visibility_settings['show_no_last_heard']).lower()});
         }});
     }});
     </script>
     """
-    m.get_root().html.add_child(folium.Element(slider_html))
+    m.get_root().html.add_child(folium.Element(key_html))
 
 def add_map_key(m, primary_node_id):
     key_html = f"""
