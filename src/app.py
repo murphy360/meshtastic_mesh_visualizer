@@ -181,6 +181,13 @@ def calculate_precision_radius(precision_bits):
     else:
         return 0    
 
+def is_aircraft(node):
+    """
+    Determine if a node represents an aircraft based on altitude > 5000m
+    """
+    altitude = node.get('alt', 0)
+    return altitude > 5000
+
 def create_map(visibility_settings=None):
     # Default visibility settings (all visible)
     if visibility_settings is None:
@@ -217,6 +224,8 @@ def create_map(visibility_settings=None):
 
     for node in mesh_data["nodes"][1:]:
         total_nodes_count += 1
+
+        node_is_aircraft = is_aircraft(node)
         
         if 'lastHeard' in node:
             last_heard_time = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc)
@@ -259,12 +268,19 @@ def create_map(visibility_settings=None):
         node['last_heard_str'] = last_heard
         node['last_heard_time'] = last_heard_time
         node['age_group'] = age_group
+        node['is_aircraft'] = node_is_aircraft
 
         if node['lat'] == 0 or node['lon'] == 0:
             nodes_without_position.append(node)
         else:
-            icon = folium.Icon(color=color)
-            popup_text = f"{node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard}"
+            # Use plane icon for aircraft, regular marker for others
+            if node_is_aircraft:
+                icon = folium.Icon(color=color, icon='plane', prefix='fa')
+                popup_text = f"✈️ {node['id']} (Aircraft)<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard}"
+            else:
+                icon = folium.Icon(color=color)
+                popup_text = f"{node['id']}<br>Altitude: {node['alt']}m<br>Last Heard: {last_heard}"
+            
             if node.get('hopsAway', 0) != 0:
                 popup_text += f"<br>Hops Away: {node['hopsAway']}"
             
@@ -564,11 +580,13 @@ def add_nodes_without_position(m, nodes_without_position):
     """
     for node in nodes_without_position:
         color = node['color']
+        is_aircraft = node.get('is_aircraft', False)
+        icon_class = 'fa-plane' if is_aircraft else 'fa-map-marker'
         hops_away_text = f"{node['hopsAway']}" if node['hopsAway'] != -1 else "N/A"
         connections = ", ".join(node['connections'])
         nodes_html += f"""
                     <tr>
-                        <td style="border: 1px solid black; padding: 5px;"><i class='fa fa-map-marker' style='color:{color}'></i></td>
+                        <td style="border: 1px solid black; padding: 5px;"><i class='fa {icon_class}' style='color:{color}'></i></td>
                         <td style="border: 1px solid black; padding: 5px;">{node['id']}</td>
                         <td style="border: 1px solid black; padding: 5px;">{node['last_heard_str']}</td>
                         <td style="border: 1px solid black; padding: 5px;">{hops_away_text}</td>
