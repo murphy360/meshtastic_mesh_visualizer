@@ -63,6 +63,16 @@ def refresh_data():
     read_mesh_data()
     return jsonify({"status": "refreshed", "timestamp": datetime.now().isoformat()})
 
+@app.route('/get_mesh_data')
+def get_mesh_data_endpoint():
+    """Return current mesh data as JSON for live updates"""
+    read_mesh_data()
+    return jsonify({
+        "last_update": mesh_data.get("last_update", "N/A"),
+        "nodes": mesh_data.get("nodes", []),
+        "timestamp": datetime.now().isoformat()
+    })
+
 @app.route('/filter_map')
 def filter_map():
     """Create a filtered map based on visibility toggles"""
@@ -360,7 +370,6 @@ def create_map(visibility_settings=None):
                 ).add_to(m)
 
     add_interactive_map_key(m, main_node['id'], visibility_settings, age_group_counts)
-    add_last_updated_label_with_refresh(m, visibility_settings)
     add_sitrep_data(m)
     add_nodes_without_position(m, nodes_without_position)
 
@@ -421,6 +430,9 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
             Visible: {sum(count for key, count in age_group_counts.items() 
                       if visibility_settings.get(f'show_{key}', True))} / {sum(age_group_counts.values())} nodes
         </div>
+        <div style="margin-top: 5px; font-size: 10px; color: gray; border-top: 1px solid #eee; padding-top: 3px;" id="last-updated-timestamp">
+            Last Updated: {mesh_data.get('last_update', 'N/A')}
+        </div>
     </div>
     
     <script>
@@ -466,6 +478,35 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
         document.getElementById('toggle-no-last-heard').addEventListener('click', function() {{
             toggleVisibility('no_last_heard', {str(visibility_settings['show_no_last_heard']).lower()});
         }});
+        
+        // Smooth refresh function that only updates timestamps and data
+        function refreshData() {{
+            fetch('/get_mesh_data')
+                .then(response => response.json())
+                .then(data => {{
+                    // Update the last updated timestamp in the key
+                    const lastUpdatedElement = document.getElementById('last-updated-timestamp');
+                    if (lastUpdatedElement) {{
+                        lastUpdatedElement.textContent = 'Last Updated: ' + data.last_update;
+                    }}
+                    
+                    console.log('Data refreshed at:', data.timestamp);
+                }})
+                .catch(error => {{
+                    console.error('Error refreshing data:', error);
+                    // Fall back to full page refresh if data fetch fails after 3 failures
+                    if (!window.refreshFailures) window.refreshFailures = 0;
+                    window.refreshFailures++;
+                    if (window.refreshFailures >= 3) {{
+                        console.log('Multiple refresh failures, falling back to full page reload');
+                        window.location.reload();
+                    }}
+                }});
+        }}
+        
+        // Set up smooth refresh every 10 seconds
+        setInterval(refreshData, 10000);
+        console.log('Smooth refresh enabled - updating every 10 seconds');
     }});
     </script>
     """
@@ -485,58 +526,6 @@ def add_map_key(m, primary_node_id):
     </div>
     """
     m.get_root().html.add_child(folium.Element(key_html))
-
-def add_last_updated_label(m):
-    last_updated = mesh_data.get("last_update", "N/A")
-    logging.info(f"Adding last updated label to the map. Last updated: {last_updated}")
-    last_updated_html = f"""
-    <div style="position: fixed; 
-                bottom: 10px; left: 50px; width: 250px; height: 30px; 
-                background-color: white; border:2px solid grey; z-index:9999; font-size:14px; white-space: nowrap;">
-        &nbsp;Last Updated: {last_updated}
-    </div>
-    
-    <script>
-    // Auto-refresh the page every 10 seconds
-    setTimeout(function() {{
-        console.log('Auto-refreshing page...');
-        window.location.reload();
-    }}, 10000); // 10 seconds
-    </script>
-    """
-    m.get_root().html.add_child(folium.Element(last_updated_html))
-
-def add_last_updated_label_with_refresh(m, visibility_settings=None):
-    """Add last updated label with auto-refresh that preserves visibility settings"""
-    last_updated = mesh_data.get("last_update", "N/A")
-    logging.info(f"Adding last updated label to the map. Last updated: {last_updated}")
-    
-    # Build refresh URL with current visibility settings
-    if visibility_settings:
-        refresh_url = "/filter_map?"
-        params = []
-        for key, value in visibility_settings.items():
-            params.append(f"{key}={str(value).lower()}")
-        refresh_url += "&".join(params)
-    else:
-        refresh_url = "/"
-    
-    last_updated_html = f"""
-    <div style="position: fixed; 
-                bottom: 10px; left: 50px; width: 250px; height: 30px; 
-                background-color: white; border:2px solid grey; z-index:9999; font-size:14px; white-space: nowrap;">
-        &nbsp;Last Updated: {last_updated}
-    </div>
-    
-    <script>
-    // Auto-refresh the page every 10 seconds, preserving current settings
-    setTimeout(function() {{
-        console.log('Auto-refreshing page with settings...');
-        window.location.href = '{refresh_url}';
-    }}, 10000); // 10 seconds
-    </script>
-    """
-    m.get_root().html.add_child(folium.Element(last_updated_html))
 
 def add_sitrep_data(m):
     sitrep_time = mesh_data.get("sitrep_time", "N/A")
