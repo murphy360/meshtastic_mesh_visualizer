@@ -105,17 +105,23 @@ def read_mesh_data():
             mesh_data = new_mesh_data
         else:
             logging.debug("Mesh data unchanged")
+        
+        # Always update the last_update timestamp to show when we last checked
+        mesh_data['last_update'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
             
         logging.debug(f"Current mesh data timestamp: {mesh_data.get('last_update', 'N/A')}")
     except FileNotFoundError:
         logging.warning(f"Mesh data file not found at {MESH_DATA_FILE}. Using default data.")
         mesh_data = DEFAULT_MESH_DATA
+        mesh_data['last_update'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
     except json.JSONDecodeError as e:
         logging.error(f"Error parsing mesh data JSON: {e}. Using default data.")
         mesh_data = DEFAULT_MESH_DATA
+        mesh_data['last_update'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
     except Exception as e:
         logging.error(f"Unexpected error reading mesh data: {e}. Using default data.")
         mesh_data = DEFAULT_MESH_DATA
+        mesh_data['last_update'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')
 
 def time_since_last_heard(last_heard_time):
     now = datetime.now(timezone.utc)
@@ -354,7 +360,7 @@ def create_map(visibility_settings=None):
                 ).add_to(m)
 
     add_interactive_map_key(m, main_node['id'], visibility_settings, age_group_counts)
-    add_last_updated_label(m)
+    add_last_updated_label_with_refresh(m, visibility_settings)
     add_sitrep_data(m)
     add_nodes_without_position(m, nodes_without_position)
 
@@ -489,6 +495,46 @@ def add_last_updated_label(m):
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px; white-space: nowrap;">
         &nbsp;Last Updated: {last_updated}
     </div>
+    
+    <script>
+    // Auto-refresh the page every 10 seconds
+    setTimeout(function() {{
+        console.log('Auto-refreshing page...');
+        window.location.reload();
+    }}, 10000); // 10 seconds
+    </script>
+    """
+    m.get_root().html.add_child(folium.Element(last_updated_html))
+
+def add_last_updated_label_with_refresh(m, visibility_settings=None):
+    """Add last updated label with auto-refresh that preserves visibility settings"""
+    last_updated = mesh_data.get("last_update", "N/A")
+    logging.info(f"Adding last updated label to the map. Last updated: {last_updated}")
+    
+    # Build refresh URL with current visibility settings
+    if visibility_settings:
+        refresh_url = "/filter_map?"
+        params = []
+        for key, value in visibility_settings.items():
+            params.append(f"{key}={str(value).lower()}")
+        refresh_url += "&".join(params)
+    else:
+        refresh_url = "/"
+    
+    last_updated_html = f"""
+    <div style="position: fixed; 
+                bottom: 10px; left: 50px; width: 250px; height: 30px; 
+                background-color: white; border:2px solid grey; z-index:9999; font-size:14px; white-space: nowrap;">
+        &nbsp;Last Updated: {last_updated}
+    </div>
+    
+    <script>
+    // Auto-refresh the page every 10 seconds, preserving current settings
+    setTimeout(function() {{
+        console.log('Auto-refreshing page with settings...');
+        window.location.href = '{refresh_url}';
+    }}, 10000); // 10 seconds
+    </script>
     """
     m.get_root().html.add_child(folium.Element(last_updated_html))
 
