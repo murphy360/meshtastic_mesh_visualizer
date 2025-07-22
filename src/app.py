@@ -29,6 +29,8 @@ COLOR_CONNECTION_DEFAULT = 'green'
 COLOR_CONNECTION_NON_PRIMARY = 'gray'
 COLOR_PRECISION_CIRCLE = 'red'
 COLOR_RECEIVE_RANGE = 'lightblue'
+COLOR_RECEIVE_RANGE_1HOP = 'lightgreen'
+COLOR_RECEIVE_RANGE_2HOP = 'lightyellow'
 
 # Sample .json data for mesh nodes
 DEFAULT_MESH_DATA = {
@@ -39,7 +41,12 @@ DEFAULT_MESH_DATA = {
         {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "lastHeard": "1739400886", "hopsAway": 0, "connections": ["node1"]},
         {"id": "node3", "lat": 0, "lon": 0, "alt": 0, "lastHeard": "1739400960", "hopsAway": 1, "connections": ["node1"]},
         {"id": "node4", "lat": 37.7849, "lon": -122.4094, "alt": 15, "lastHeard": "1739400800", "hopsAway": 0, "connections": ["node1"]},
-        {"id": "node5", "lat": 37.7649, "lon": -122.4294, "alt": 25, "lastHeard": "1739400900", "hopsAway": 0, "connections": ["node1"]}
+        {"id": "node5", "lat": 37.7649, "lon": -122.4294, "alt": 25, "lastHeard": "1739400900", "hopsAway": 0, "connections": ["node1"]},
+        {"id": "node6", "lat": 37.7549, "lon": -122.4394, "alt": 30, "lastHeard": "1739400800", "hopsAway": 1, "connections": ["node2"]},
+        {"id": "node7", "lat": 37.7949, "lon": -122.4594, "alt": 35, "lastHeard": "1739400850", "hopsAway": 1, "connections": ["node4"]},
+        {"id": "node8", "lat": 37.7349, "lon": -122.3994, "alt": 40, "lastHeard": "1739400750", "hopsAway": 2, "connections": ["node6"]},
+        {"id": "node9", "lat": 37.8149, "lon": -122.4794, "alt": 45, "lastHeard": "1739400780", "hopsAway": 2, "connections": ["node7"]},
+        {"id": "node10", "lat": 37.7449, "lon": -122.4494, "alt": 50, "lastHeard": "1739400820", "hopsAway": 2, "connections": ["node6"]}
     ],
     "sitrep": [
         "CQ CQ CQ de DPMM.  My 1801Z 15 Feb 2025 SITREP is as follows:", 
@@ -86,6 +93,8 @@ def filter_map():
     show_over_week = request.args.get('show_over_week', 'true').lower() == 'true'
     show_no_last_heard = request.args.get('show_no_last_heard', 'true').lower() == 'true'
     show_receive_range = request.args.get('show_receive_range', 'false').lower() == 'true'
+    show_receive_range_1hop = request.args.get('show_receive_range_1hop', 'false').lower() == 'true'
+    show_receive_range_2hop = request.args.get('show_receive_range_2hop', 'false').lower() == 'true'
     
     visibility_settings = {
         'show_last_hour': show_last_hour,
@@ -93,7 +102,9 @@ def filter_map():
         'show_last_week': show_last_week,
         'show_over_week': show_over_week,
         'show_no_last_heard': show_no_last_heard,
-        'show_receive_range': show_receive_range
+        'show_receive_range': show_receive_range,
+        'show_receive_range_1hop': show_receive_range_1hop,
+        'show_receive_range_2hop': show_receive_range_2hop
     }
     
     logging.info(f"Filtering map with visibility settings: {visibility_settings}")
@@ -193,10 +204,16 @@ def is_aircraft(node):
     altitude = node.get('alt', 0)
     return altitude > 5000
 
-def create_receive_range_polygon(nodes, main_node, visibility_settings):
+def create_receive_range_polygon(nodes, main_node, visibility_settings, hop_count=0):
     """
-    Create a polygon around all nodes with 0 hops to show primary node receive range
+    Create a polygon around all nodes with specified hop count to show network range
     Only includes nodes that are currently visible based on visibility settings
+    
+    Args:
+        nodes: List of all nodes
+        main_node: The primary node
+        visibility_settings: Current visibility settings
+        hop_count: Number of hops away from primary node (0, 1, 2, etc.)
     """
     import math
     from datetime import datetime, timezone, timedelta
@@ -207,10 +224,10 @@ def create_receive_range_polygon(nodes, main_node, visibility_settings):
     one_day_ago = now - timedelta(days=1)
     one_week_ago = now - timedelta(weeks=1)
     
-    # Get all nodes with 0 hops that have valid positions and are currently visible
-    zero_hop_nodes = []
+    # Get all nodes with specified hop count that have valid positions and are currently visible
+    hop_nodes = []
     for node in nodes:
-        if (node.get('hopsAway', -1) == 0 and 
+        if (node.get('hopsAway', -1) == hop_count and 
             node['lat'] != 0 and node['lon'] != 0 and 
             node != main_node):  # Exclude the main node itself
             
@@ -232,13 +249,13 @@ def create_receive_range_polygon(nodes, main_node, visibility_settings):
             
             # Only include if the node would be visible
             if node_should_show:
-                zero_hop_nodes.append([node['lat'], node['lon']])
+                hop_nodes.append([node['lat'], node['lon']])
     
-    # Include the main node in the polygon (always visible)
-    if main_node['lat'] != 0 and main_node['lon'] != 0:
-        zero_hop_nodes.append([main_node['lat'], main_node['lon']])
+    # Include the main node in the 0-hop polygon (always visible)
+    if hop_count == 0 and main_node['lat'] != 0 and main_node['lon'] != 0:
+        hop_nodes.append([main_node['lat'], main_node['lon']])
     
-    if len(zero_hop_nodes) < 3:
+    if len(hop_nodes) < 3:
         # Need at least 3 points to create a polygon
         return None
         
@@ -268,14 +285,14 @@ def create_receive_range_polygon(nodes, main_node, visibility_settings):
             
             return lower[:-1] + upper[:-1]
         
-        hull_points = convex_hull(zero_hop_nodes)
+        hull_points = convex_hull(hop_nodes)
         
         # Convert back to list of [lat, lon] pairs
         polygon_coords = [[float(p[0]), float(p[1])] for p in hull_points]
         
         return polygon_coords
     except Exception as e:
-        logging.warning(f"Could not create receive range polygon: {e}")
+        logging.warning(f"Could not create receive range polygon for {hop_count}-hop nodes: {e}")
         return None
 
 def create_map(visibility_settings=None):
@@ -287,7 +304,9 @@ def create_map(visibility_settings=None):
             'show_last_week': False,
             'show_over_week': False,
             'show_no_last_heard': False,
-            'show_receive_range': False
+            'show_receive_range': False,
+            'show_receive_range_1hop': False,
+            'show_receive_range_2hop': False
         }
     
     main_node = mesh_data["nodes"][0]
@@ -476,9 +495,9 @@ def create_map(visibility_settings=None):
                     color=connection_color
                 ).add_to(m)
 
-    # Add receive range polygon if enabled
+    # Add receive range polygons if enabled
     if visibility_settings.get('show_receive_range', False):
-        polygon_coords = create_receive_range_polygon(mesh_data["nodes"], main_node, visibility_settings)
+        polygon_coords = create_receive_range_polygon(mesh_data["nodes"], main_node, visibility_settings, hop_count=0)
         if polygon_coords:
             folium.Polygon(
                 locations=polygon_coords,
@@ -489,9 +508,41 @@ def create_map(visibility_settings=None):
                 fillOpacity=0.2,
                 popup="Primary Node Receive Range (0-hop nodes)"
             ).add_to(m)
-            logging.info(f"Added receive range polygon with {len(polygon_coords)} points")
+            logging.info(f"Added 0-hop receive range polygon with {len(polygon_coords)} points")
         else:
             logging.info("Not enough visible 0-hop nodes to create receive range polygon")
+    
+    if visibility_settings.get('show_receive_range_1hop', False):
+        polygon_coords_1hop = create_receive_range_polygon(mesh_data["nodes"], main_node, visibility_settings, hop_count=1)
+        if polygon_coords_1hop:
+            folium.Polygon(
+                locations=polygon_coords_1hop,
+                color=COLOR_RECEIVE_RANGE_1HOP,
+                weight=3,
+                fill=True,
+                fillColor=COLOR_RECEIVE_RANGE_1HOP,
+                fillOpacity=0.15,
+                popup="1-Hop Network Range (1-hop nodes)"
+            ).add_to(m)
+            logging.info(f"Added 1-hop receive range polygon with {len(polygon_coords_1hop)} points")
+        else:
+            logging.info("Not enough visible 1-hop nodes to create receive range polygon")
+    
+    if visibility_settings.get('show_receive_range_2hop', False):
+        polygon_coords_2hop = create_receive_range_polygon(mesh_data["nodes"], main_node, visibility_settings, hop_count=2)
+        if polygon_coords_2hop:
+            folium.Polygon(
+                locations=polygon_coords_2hop,
+                color=COLOR_RECEIVE_RANGE_2HOP,
+                weight=3,
+                fill=True,
+                fillColor=COLOR_RECEIVE_RANGE_2HOP,
+                fillOpacity=0.1,
+                popup="2-Hop Network Range (2-hop nodes)"
+            ).add_to(m)
+            logging.info(f"Added 2-hop receive range polygon with {len(polygon_coords_2hop)} points")
+        else:
+            logging.info("Not enough visible 2-hop nodes to create receive range polygon")
 
     add_interactive_map_key(m, main_node['id'], visibility_settings, age_group_counts)
     add_sitrep_data(m)
@@ -544,7 +595,15 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
         <div style="margin-top: 8px; border-top: 1px solid #ccc; padding-top: 5px;">
             <div id="toggle-receive-range" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings.get('show_receive_range', False))}">
                 <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings.get('show_receive_range', False))}</span>
-                <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE}"></i>&nbsp;Receive Range (0-hop polygon)
+                <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE}"></i>&nbsp;0-Hop Range (direct connections)
+            </div>
+            <div id="toggle-receive-range-1hop" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings.get('show_receive_range_1hop', False))}">
+                <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings.get('show_receive_range_1hop', False))}</span>
+                <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE_1HOP}"></i>&nbsp;1-Hop Range (network reach)
+            </div>
+            <div id="toggle-receive-range-2hop" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings.get('show_receive_range_2hop', False))}">
+                <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings.get('show_receive_range_2hop', False))}</span>
+                <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE_2HOP}"></i>&nbsp;2-Hop Range (extended reach)
             </div>
             <div style="margin: 2px 0; font-size: 12px;">
                 <i class="fa fa-circle-o" style="color:{COLOR_PRECISION_CIRCLE}"></i>&nbsp;Range Rings - Position Precision
@@ -579,6 +638,8 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
             url.searchParams.set('show_over_week', '{str(visibility_settings["show_over_week"]).lower()}');
             url.searchParams.set('show_no_last_heard', '{str(visibility_settings["show_no_last_heard"]).lower()}');
             url.searchParams.set('show_receive_range', '{str(visibility_settings.get("show_receive_range", False)).lower()}');
+            url.searchParams.set('show_receive_range_1hop', '{str(visibility_settings.get("show_receive_range_1hop", False)).lower()}');
+            url.searchParams.set('show_receive_range_2hop', '{str(visibility_settings.get("show_receive_range_2hop", False)).lower()}');
             
             // Toggle the specific group
             url.searchParams.set('show_' + group, newState.toString());
@@ -610,6 +671,14 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
         
         document.getElementById('toggle-receive-range').addEventListener('click', function() {{
             toggleVisibility('receive_range', {str(visibility_settings.get('show_receive_range', False)).lower()});
+        }});
+        
+        document.getElementById('toggle-receive-range-1hop').addEventListener('click', function() {{
+            toggleVisibility('receive_range_1hop', {str(visibility_settings.get('show_receive_range_1hop', False)).lower()});
+        }});
+        
+        document.getElementById('toggle-receive-range-2hop').addEventListener('click', function() {{
+            toggleVisibility('receive_range_2hop', {str(visibility_settings.get('show_receive_range_2hop', False)).lower()});
         }});
         
         // Smooth refresh function that only updates timestamps and data
