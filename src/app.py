@@ -193,21 +193,48 @@ def is_aircraft(node):
     altitude = node.get('alt', 0)
     return altitude > 5000
 
-def create_receive_range_polygon(nodes, main_node):
+def create_receive_range_polygon(nodes, main_node, visibility_settings):
     """
     Create a polygon around all nodes with 0 hops to show primary node receive range
+    Only includes nodes that are currently visible based on visibility settings
     """
     import math
+    from datetime import datetime, timezone, timedelta
     
-    # Get all nodes with 0 hops that have valid positions
+    # Time thresholds for age groups
+    now = datetime.now(timezone.utc)
+    one_hour_ago = now - timedelta(hours=1)
+    one_day_ago = now - timedelta(days=1)
+    one_week_ago = now - timedelta(weeks=1)
+    
+    # Get all nodes with 0 hops that have valid positions and are currently visible
     zero_hop_nodes = []
     for node in nodes:
         if (node.get('hopsAway', -1) == 0 and 
             node['lat'] != 0 and node['lon'] != 0 and 
             node != main_node):  # Exclude the main node itself
-            zero_hop_nodes.append([node['lat'], node['lon']])
+            
+            # Check if this node would be visible based on age and visibility settings
+            node_should_show = True
+            
+            if 'lastHeard' in node and node['lastHeard']:
+                last_heard_time = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc)
+                if last_heard_time > one_hour_ago:
+                    node_should_show = visibility_settings.get('show_last_hour', True)
+                elif last_heard_time > one_day_ago:
+                    node_should_show = visibility_settings.get('show_last_day', True)
+                elif last_heard_time > one_week_ago:
+                    node_should_show = visibility_settings.get('show_last_week', True)
+                else:
+                    node_should_show = visibility_settings.get('show_over_week', True)
+            else:
+                node_should_show = visibility_settings.get('show_no_last_heard', True)
+            
+            # Only include if the node would be visible
+            if node_should_show:
+                zero_hop_nodes.append([node['lat'], node['lon']])
     
-    # Include the main node in the polygon
+    # Include the main node in the polygon (always visible)
     if main_node['lat'] != 0 and main_node['lon'] != 0:
         zero_hop_nodes.append([main_node['lat'], main_node['lon']])
     
@@ -451,7 +478,7 @@ def create_map(visibility_settings=None):
 
     # Add receive range polygon if enabled
     if visibility_settings.get('show_receive_range', False):
-        polygon_coords = create_receive_range_polygon(mesh_data["nodes"], main_node)
+        polygon_coords = create_receive_range_polygon(mesh_data["nodes"], main_node, visibility_settings)
         if polygon_coords:
             folium.Polygon(
                 locations=polygon_coords,
@@ -463,6 +490,8 @@ def create_map(visibility_settings=None):
                 popup="Primary Node Receive Range (0-hop nodes)"
             ).add_to(m)
             logging.info(f"Added receive range polygon with {len(polygon_coords)} points")
+        else:
+            logging.info("Not enough visible 0-hop nodes to create receive range polygon")
 
     add_interactive_map_key(m, main_node['id'], visibility_settings, age_group_counts)
     add_sitrep_data(m)
