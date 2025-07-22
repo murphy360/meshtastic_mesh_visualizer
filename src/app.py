@@ -28,15 +28,18 @@ COLOR_NO_LAST_HEARD = 'red'
 COLOR_CONNECTION_DEFAULT = 'green'
 COLOR_CONNECTION_NON_PRIMARY = 'gray'
 COLOR_PRECISION_CIRCLE = 'red'
+COLOR_RECEIVE_RANGE = 'lightblue'
 
 # Sample .json data for mesh nodes
 DEFAULT_MESH_DATA = {
     "last_update": "2024-04-23T00:00:00Z",
     "sitrep_time": "2024-04-23T00:00:00Z",
     "nodes": [
-        {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "lastHeard": "", "connections": ["node2", "node3"]},
-        {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "lastHeard": "1739400886",  "connections": ["node1"]},
-        {"id": "node3", "lat": 0, "lon": 0, "alt": 0, "lastHeard": "1739400960",  "connections": ["node1"]}
+        {"id": "node1", "lat": 37.7749, "lon": -122.4194, "alt": 10, "lastHeard": "", "hopsAway": 0, "connections": ["node2", "node3"]},
+        {"id": "node2", "lat": 37.8044, "lon": -122.2711, "alt": 20, "lastHeard": "1739400886", "hopsAway": 0, "connections": ["node1"]},
+        {"id": "node3", "lat": 0, "lon": 0, "alt": 0, "lastHeard": "1739400960", "hopsAway": 1, "connections": ["node1"]},
+        {"id": "node4", "lat": 37.7849, "lon": -122.4094, "alt": 15, "lastHeard": "1739400800", "hopsAway": 0, "connections": ["node1"]},
+        {"id": "node5", "lat": 37.7649, "lon": -122.4294, "alt": 25, "lastHeard": "1739400900", "hopsAway": 0, "connections": ["node1"]}
     ],
     "sitrep": [
         "CQ CQ CQ de DPMM.  My 1801Z 15 Feb 2025 SITREP is as follows:", 
@@ -82,13 +85,15 @@ def filter_map():
     show_last_week = request.args.get('show_last_week', 'true').lower() == 'true'
     show_over_week = request.args.get('show_over_week', 'true').lower() == 'true'
     show_no_last_heard = request.args.get('show_no_last_heard', 'true').lower() == 'true'
+    show_receive_range = request.args.get('show_receive_range', 'false').lower() == 'true'
     
     visibility_settings = {
         'show_last_hour': show_last_hour,
         'show_last_day': show_last_day,
         'show_last_week': show_last_week,
         'show_over_week': show_over_week,
-        'show_no_last_heard': show_no_last_heard
+        'show_no_last_heard': show_no_last_heard,
+        'show_receive_range': show_receive_range
     }
     
     logging.info(f"Filtering map with visibility settings: {visibility_settings}")
@@ -188,6 +193,64 @@ def is_aircraft(node):
     altitude = node.get('alt', 0)
     return altitude > 5000
 
+def create_receive_range_polygon(nodes, main_node):
+    """
+    Create a polygon around all nodes with 0 hops to show primary node receive range
+    """
+    import math
+    
+    # Get all nodes with 0 hops that have valid positions
+    zero_hop_nodes = []
+    for node in nodes:
+        if (node.get('hopsAway', -1) == 0 and 
+            node['lat'] != 0 and node['lon'] != 0 and 
+            node != main_node):  # Exclude the main node itself
+            zero_hop_nodes.append([node['lat'], node['lon']])
+    
+    # Include the main node in the polygon
+    if main_node['lat'] != 0 and main_node['lon'] != 0:
+        zero_hop_nodes.append([main_node['lat'], main_node['lon']])
+    
+    if len(zero_hop_nodes) < 3:
+        # Need at least 3 points to create a polygon
+        return None
+        
+    try:
+        # Simple convex hull algorithm (Gift wrapping / Jarvis march)
+        def cross_product(o, a, b):
+            return (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0])
+        
+        def convex_hull(points):
+            points = sorted(set(tuple(p) for p in points))
+            if len(points) <= 1:
+                return points
+            
+            # Build lower hull
+            lower = []
+            for p in points:
+                while len(lower) >= 2 and cross_product(lower[-2], lower[-1], p) <= 0:
+                    lower.pop()
+                lower.append(p)
+            
+            # Build upper hull
+            upper = []
+            for p in reversed(points):
+                while len(upper) >= 2 and cross_product(upper[-2], upper[-1], p) <= 0:
+                    upper.pop()
+                upper.append(p)
+            
+            return lower[:-1] + upper[:-1]
+        
+        hull_points = convex_hull(zero_hop_nodes)
+        
+        # Convert back to list of [lat, lon] pairs
+        polygon_coords = [[float(p[0]), float(p[1])] for p in hull_points]
+        
+        return polygon_coords
+    except Exception as e:
+        logging.warning(f"Could not create receive range polygon: {e}")
+        return None
+
 def create_map(visibility_settings=None):
     # Default visibility settings (all visible)
     if visibility_settings is None:
@@ -196,7 +259,8 @@ def create_map(visibility_settings=None):
             'show_last_day': True,
             'show_last_week': False,
             'show_over_week': False,
-            'show_no_last_heard': False
+            'show_no_last_heard': False,
+            'show_receive_range': False
         }
     
     main_node = mesh_data["nodes"][0]
@@ -385,6 +449,21 @@ def create_map(visibility_settings=None):
                     color=connection_color
                 ).add_to(m)
 
+    # Add receive range polygon if enabled
+    if visibility_settings.get('show_receive_range', False):
+        polygon_coords = create_receive_range_polygon(mesh_data["nodes"], main_node)
+        if polygon_coords:
+            folium.Polygon(
+                locations=polygon_coords,
+                color=COLOR_RECEIVE_RANGE,
+                weight=3,
+                fill=True,
+                fillColor=COLOR_RECEIVE_RANGE,
+                fillOpacity=0.2,
+                popup="Primary Node Receive Range (0-hop nodes)"
+            ).add_to(m)
+            logging.info(f"Added receive range polygon with {len(polygon_coords)} points")
+
     add_interactive_map_key(m, main_node['id'], visibility_settings, age_group_counts)
     add_sitrep_data(m)
     add_nodes_without_position(m, nodes_without_position)
@@ -404,7 +483,7 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
     
     key_html = f"""
     <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 320px; height: 300px; 
+                bottom: 50px; left: 50px; width: 320px; height: 320px; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
         <b>Key - Click to Toggle Visibility</b><br>
         <div style="margin-top: 5px;">
@@ -434,6 +513,10 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
             </div>
         </div>
         <div style="margin-top: 8px; border-top: 1px solid #ccc; padding-top: 5px;">
+            <div id="toggle-receive-range" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings.get('show_receive_range', False))}">
+                <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings.get('show_receive_range', False))}</span>
+                <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE}"></i>&nbsp;Receive Range (0-hop polygon)
+            </div>
             <div style="margin: 2px 0; font-size: 12px;">
                 <i class="fa fa-circle-o" style="color:{COLOR_PRECISION_CIRCLE}"></i>&nbsp;Range Rings - Position Precision
             </div>
@@ -466,6 +549,7 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
             url.searchParams.set('show_last_week', '{str(visibility_settings["show_last_week"]).lower()}');
             url.searchParams.set('show_over_week', '{str(visibility_settings["show_over_week"]).lower()}');
             url.searchParams.set('show_no_last_heard', '{str(visibility_settings["show_no_last_heard"]).lower()}');
+            url.searchParams.set('show_receive_range', '{str(visibility_settings.get("show_receive_range", False)).lower()}');
             
             // Toggle the specific group
             url.searchParams.set('show_' + group, newState.toString());
@@ -493,6 +577,10 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
         
         document.getElementById('toggle-no-last-heard').addEventListener('click', function() {{
             toggleVisibility('no_last_heard', {str(visibility_settings['show_no_last_heard']).lower()});
+        }});
+        
+        document.getElementById('toggle-receive-range').addEventListener('click', function() {{
+            toggleVisibility('receive_range', {str(visibility_settings.get('show_receive_range', False)).lower()});
         }});
         
         // Smooth refresh function that only updates timestamps and data
