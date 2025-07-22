@@ -218,7 +218,7 @@ def create_map(visibility_settings=None):
     for node in mesh_data["nodes"][1:]:
         total_nodes_count += 1
         
-        if node['lastHeard']:
+        if 'lastHeard' in node:
             last_heard_time = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc)
             last_heard = time_since_last_heard(last_heard_time)
         else:
@@ -326,7 +326,7 @@ def create_map(visibility_settings=None):
             
         # Check if this node is visible
         if node != main_node:  # Skip visibility check for main node
-            if node['lastHeard']:
+            if 'lastHeard' in node:
                 last_heard_time = datetime.fromtimestamp(int(node['lastHeard']), tz=timezone.utc)
                 if last_heard_time > one_hour_ago:
                     should_show = visibility_settings.get('show_last_hour', True)
