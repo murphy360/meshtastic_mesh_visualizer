@@ -149,9 +149,9 @@ def create_map(visibility_settings=None):
         visibility_settings = {
             'show_last_hour': True,
             'show_last_day': True,
-            'show_last_week': True,
-            'show_over_week': True,
-            'show_no_last_heard': True
+            'show_last_week': False,
+            'show_over_week': False,
+            'show_no_last_heard': False
         }
     
     main_node = mesh_data["nodes"][0]
