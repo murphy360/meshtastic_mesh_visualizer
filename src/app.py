@@ -356,6 +356,7 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
         <b>Key - Click to Toggle Visibility</b><br>
         <div style="margin-top: 5px;">
             <div style="margin: 2px 0;">
+                <span style="font-size: 12px;">👁️</span>
                 <i class="fa fa-star" style="color:{COLOR_PRIMARY_NODE}"></i>&nbsp;{primary_node_id} (Always visible)
             </div>
             <div id="toggle-last-hour" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_last_hour'])}">
