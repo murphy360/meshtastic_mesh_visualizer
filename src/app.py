@@ -2,6 +2,7 @@ import json
 import logging
 import os
 import time
+import threading
 import folium
 from datetime import datetime, timezone, timedelta
 from watchdog.observers import Observer
@@ -55,6 +56,13 @@ def index():
     logging.info("Request received for index.")
     return update_map()
 
+@app.route('/refresh')
+def refresh_data():
+    """Manual refresh endpoint"""
+    logging.info("Manual refresh requested")
+    read_mesh_data()
+    return jsonify({"status": "refreshed", "timestamp": datetime.now().isoformat()})
+
 @app.route('/filter_map')
 def filter_map():
     """Create a filtered map based on visibility toggles"""
@@ -87,12 +95,26 @@ def filter_map():
 def read_mesh_data():
     global mesh_data
     try:
-        logging.info("Reading mesh data from file.")
+        logging.info(f"Reading mesh data from file: {MESH_DATA_FILE}")
         with open(MESH_DATA_FILE, 'r') as f:
-            mesh_data = json.load(f)
-        logging.info(f"Mesh data: {mesh_data}")
+            new_mesh_data = json.load(f)
+        
+        # Check if data has changed
+        if mesh_data != new_mesh_data:
+            logging.info("Mesh data has changed, updating...")
+            mesh_data = new_mesh_data
+        else:
+            logging.debug("Mesh data unchanged")
+            
+        logging.debug(f"Current mesh data timestamp: {mesh_data.get('last_update', 'N/A')}")
     except FileNotFoundError:
-        logging.warning(f"Mesh data file not found. Using default data.")
+        logging.warning(f"Mesh data file not found at {MESH_DATA_FILE}. Using default data.")
+        mesh_data = DEFAULT_MESH_DATA
+    except json.JSONDecodeError as e:
+        logging.error(f"Error parsing mesh data JSON: {e}. Using default data.")
+        mesh_data = DEFAULT_MESH_DATA
+    except Exception as e:
+        logging.error(f"Unexpected error reading mesh data: {e}. Using default data.")
         mesh_data = DEFAULT_MESH_DATA
 
 def time_since_last_heard(last_heard_time):
@@ -527,11 +549,21 @@ def add_nodes_without_position(m, nodes_without_position):
     m.get_root().html.add_child(folium.Element(nodes_html))
 
 def delete_old_maps():
-    logging.info("Deleting existing map.")
+    """Delete old map files to prevent accumulation"""
+    logging.info("Cleaning up old map files.")
     try:
-        os.remove('templates/map_*.html')
-    except FileNotFoundError:
-        pass
+        import glob
+        # Delete all existing map files
+        map_files = glob.glob('templates/map_*.html')
+        for map_file in map_files:
+            try:
+                os.remove(map_file)
+                logging.debug(f"Deleted old map file: {map_file}")
+            except FileNotFoundError:
+                pass
+        logging.info(f"Cleaned up {len(map_files)} old map files")
+    except Exception as e:
+        logging.error(f"Error cleaning up map files: {e}")
 
 def update_map():
     delete_old_maps()
@@ -565,7 +597,25 @@ def monitor_data_updates():
         observer.stop()
     observer.join()
 
+def background_refresh():
+    """Background thread to refresh mesh data every 10 seconds"""
+    while True:
+        try:
+            time.sleep(10)  # Refresh every 10 seconds
+            logging.info("Background refresh: Reading mesh data...")
+            read_mesh_data()
+        except Exception as e:
+            logging.error(f"Error in background refresh: {e}")
+
+def start_background_refresh():
+    """Start the background refresh thread"""
+    refresh_thread = threading.Thread(target=background_refresh, daemon=True)
+    refresh_thread.start()
+    logging.info("Background refresh thread started")
+
 if __name__ == '__main__':
-    logging.info("Starting Flask app.")
-    monitor_data_updates()
-    app.run(debug=True)
+    logging.info("Starting Flask app with background refresh.")
+    # Start background refresh thread
+    start_background_refresh()
+    # Start Flask app
+    app.run(debug=True, host='0.0.0.0', port=5000)
