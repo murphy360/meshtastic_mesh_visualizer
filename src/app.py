@@ -31,6 +31,7 @@ COLOR_PRECISION_CIRCLE = 'red'
 COLOR_RECEIVE_RANGE = 'lightblue'
 COLOR_RECEIVE_RANGE_1HOP = 'lightgreen'
 COLOR_RECEIVE_RANGE_2HOP = 'lightyellow'
+COLOR_RECEIVE_RANGE_3HOP = 'lightcoral'
 
 # Sample .json data for mesh nodes
 DEFAULT_MESH_DATA = {
@@ -46,7 +47,10 @@ DEFAULT_MESH_DATA = {
         {"id": "node7", "lat": 37.7949, "lon": -122.4594, "alt": 35, "lastHeard": "1739400850", "hopsAway": 1, "connections": ["node4"]},
         {"id": "node8", "lat": 37.7349, "lon": -122.3994, "alt": 40, "lastHeard": "1739400750", "hopsAway": 2, "connections": ["node6"]},
         {"id": "node9", "lat": 37.8149, "lon": -122.4794, "alt": 45, "lastHeard": "1739400780", "hopsAway": 2, "connections": ["node7"]},
-        {"id": "node10", "lat": 37.7449, "lon": -122.4494, "alt": 50, "lastHeard": "1739400820", "hopsAway": 2, "connections": ["node6"]}
+        {"id": "node10", "lat": 37.7449, "lon": -122.4494, "alt": 50, "lastHeard": "1739400820", "hopsAway": 2, "connections": ["node6"]},
+        {"id": "node11", "lat": 37.7149, "lon": -122.3794, "alt": 55, "lastHeard": "1739400700", "hopsAway": 3, "connections": ["node8"]},
+        {"id": "node12", "lat": 37.8349, "lon": -122.4994, "alt": 60, "lastHeard": "1739400730", "hopsAway": 3, "connections": ["node9"]},
+        {"id": "node13", "lat": 37.7249, "lon": -122.4694, "alt": 65, "lastHeard": "1739400760", "hopsAway": 3, "connections": ["node10"]}
     ],
     "sitrep": [
         "CQ CQ CQ de DPMM.  My 1801Z 15 Feb 2025 SITREP is as follows:", 
@@ -95,6 +99,7 @@ def filter_map():
     show_receive_range = request.args.get('show_receive_range', 'false').lower() == 'true'
     show_receive_range_1hop = request.args.get('show_receive_range_1hop', 'false').lower() == 'true'
     show_receive_range_2hop = request.args.get('show_receive_range_2hop', 'false').lower() == 'true'
+    show_receive_range_3hop = request.args.get('show_receive_range_3hop', 'false').lower() == 'true'
     
     visibility_settings = {
         'show_last_hour': show_last_hour,
@@ -104,7 +109,8 @@ def filter_map():
         'show_no_last_heard': show_no_last_heard,
         'show_receive_range': show_receive_range,
         'show_receive_range_1hop': show_receive_range_1hop,
-        'show_receive_range_2hop': show_receive_range_2hop
+        'show_receive_range_2hop': show_receive_range_2hop,
+        'show_receive_range_3hop': show_receive_range_3hop
     }
     
     logging.info(f"Filtering map with visibility settings: {visibility_settings}")
@@ -306,7 +312,8 @@ def create_map(visibility_settings=None):
             'show_no_last_heard': False,
             'show_receive_range': False,
             'show_receive_range_1hop': False,
-            'show_receive_range_2hop': False
+            'show_receive_range_2hop': False,
+            'show_receive_range_3hop': False
         }
     
     main_node = mesh_data["nodes"][0]
@@ -505,7 +512,7 @@ def create_map(visibility_settings=None):
                 weight=3,
                 fill=True,
                 fillColor=COLOR_RECEIVE_RANGE,
-                fillOpacity=0.2,
+                fillOpacity=0.3,
                 popup="Primary Node Receive Range (0-hop nodes)"
             ).add_to(m)
             logging.info(f"Added 0-hop receive range polygon with {len(polygon_coords)} points")
@@ -521,7 +528,7 @@ def create_map(visibility_settings=None):
                 weight=3,
                 fill=True,
                 fillColor=COLOR_RECEIVE_RANGE_1HOP,
-                fillOpacity=0.15,
+                fillOpacity=0.25,
                 popup="1-Hop Network Range (1-hop nodes)"
             ).add_to(m)
             logging.info(f"Added 1-hop receive range polygon with {len(polygon_coords_1hop)} points")
@@ -537,12 +544,28 @@ def create_map(visibility_settings=None):
                 weight=3,
                 fill=True,
                 fillColor=COLOR_RECEIVE_RANGE_2HOP,
-                fillOpacity=0.1,
+                fillOpacity=0.2,
                 popup="2-Hop Network Range (2-hop nodes)"
             ).add_to(m)
             logging.info(f"Added 2-hop receive range polygon with {len(polygon_coords_2hop)} points")
         else:
             logging.info("Not enough visible 2-hop nodes to create receive range polygon")
+    
+    if visibility_settings.get('show_receive_range_3hop', False):
+        polygon_coords_3hop = create_receive_range_polygon(mesh_data["nodes"], main_node, visibility_settings, hop_count=3)
+        if polygon_coords_3hop:
+            folium.Polygon(
+                locations=polygon_coords_3hop,
+                color=COLOR_RECEIVE_RANGE_3HOP,
+                weight=3,
+                fill=True,
+                fillColor=COLOR_RECEIVE_RANGE_3HOP,
+                fillOpacity=0.15,
+                popup="3-Hop Network Range (3-hop nodes)"
+            ).add_to(m)
+            logging.info(f"Added 3-hop receive range polygon with {len(polygon_coords_3hop)} points")
+        else:
+            logging.info("Not enough visible 3-hop nodes to create receive range polygon")
 
     add_interactive_map_key(m, main_node['id'], visibility_settings, age_group_counts)
     add_sitrep_data(m)
@@ -563,7 +586,7 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
     
     key_html = f"""
     <div style="position: fixed; 
-                bottom: 50px; left: 50px; width: 320px; height: 320px; 
+                bottom: 50px; left: 50px; width: 360px; height: 380px; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
         <b>Key - Click to Toggle Visibility</b><br>
         <div style="margin-top: 5px;">
@@ -605,6 +628,10 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
                 <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings.get('show_receive_range_2hop', False))}</span>
                 <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE_2HOP}"></i>&nbsp;2-Hop Range (extended reach)
             </div>
+            <div id="toggle-receive-range-3hop" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings.get('show_receive_range_3hop', False))}">
+                <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings.get('show_receive_range_3hop', False))}</span>
+                <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE_3HOP}"></i>&nbsp;3-Hop Range (max reach)
+            </div>
             <div style="margin: 2px 0; font-size: 12px;">
                 <i class="fa fa-circle-o" style="color:{COLOR_PRECISION_CIRCLE}"></i>&nbsp;Range Rings - Position Precision
             </div>
@@ -640,6 +667,7 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
             url.searchParams.set('show_receive_range', '{str(visibility_settings.get("show_receive_range", False)).lower()}');
             url.searchParams.set('show_receive_range_1hop', '{str(visibility_settings.get("show_receive_range_1hop", False)).lower()}');
             url.searchParams.set('show_receive_range_2hop', '{str(visibility_settings.get("show_receive_range_2hop", False)).lower()}');
+            url.searchParams.set('show_receive_range_3hop', '{str(visibility_settings.get("show_receive_range_3hop", False)).lower()}');
             
             // Toggle the specific group
             url.searchParams.set('show_' + group, newState.toString());
@@ -679,6 +707,10 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
         
         document.getElementById('toggle-receive-range-2hop').addEventListener('click', function() {{
             toggleVisibility('receive_range_2hop', {str(visibility_settings.get('show_receive_range_2hop', False)).lower()});
+        }});
+        
+        document.getElementById('toggle-receive-range-3hop').addEventListener('click', function() {{
+            toggleVisibility('receive_range_3hop', {str(visibility_settings.get('show_receive_range_3hop', False)).lower()});
         }});
         
         // Smooth refresh function that only updates timestamps and data
