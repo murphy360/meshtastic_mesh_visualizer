@@ -84,6 +84,8 @@ def get_mesh_data_endpoint():
     return jsonify({
         "last_update": mesh_data.get("last_update", "N/A"),
         "nodes": mesh_data.get("nodes", []),
+        "node_count": len(mesh_data.get("nodes", [])),
+        "data_hash": hash(str(mesh_data.get("nodes", []))),  # Simple hash to detect data changes
         "timestamp": datetime.now().isoformat()
     })
 
@@ -715,7 +717,8 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
             toggleVisibility('receive_range_3hop', {str(visibility_settings.get('show_receive_range_3hop', False)).lower()});
         }});
         
-        // Smooth refresh function that only updates timestamps and data
+        // Smooth refresh function that updates timestamps and reloads map if data changed
+        let lastDataHash = null;
         function refreshData() {{
             fetch('/get_mesh_data')
                 .then(response => response.json())
@@ -726,7 +729,19 @@ def add_interactive_map_key(m, primary_node_id, visibility_settings, age_group_c
                         lastUpdatedElement.textContent = 'Last Updated: ' + data.last_update;
                     }}
                     
-                    console.log('Data refreshed at:', data.timestamp);
+                    // Check if actual node data has changed using hash
+                    if (lastDataHash !== null && lastDataHash !== data.data_hash) {{
+                        console.log('Node data changed, reloading map. Hash changed from', lastDataHash, 'to', data.data_hash);
+                        window.location.reload();
+                        return;
+                    }}
+                    
+                    // Store the current hash for future comparisons
+                    lastDataHash = data.data_hash;
+                    
+                    console.log('Data refreshed at:', data.timestamp, 'Hash:', data.data_hash);
+                    // Reset failure counter on success
+                    window.refreshFailures = 0;
                 }})
                 .catch(error => {{
                     console.error('Error refreshing data:', error);
