@@ -298,11 +298,7 @@ temp/
 tmp/
 
 # Documentation files (since they're consolidated into README.md)
-AUTOMATION_SUMMARY.md
-FRESH_SETUP.md
-STRUCTURE_REVIEW.md
-TESTING.md
-TEST_REORGANIZATION.md
+# Note: All project documentation is now in README.md
 
 # Validation and development scripts that shouldn't be committed
 validate_structure.py
