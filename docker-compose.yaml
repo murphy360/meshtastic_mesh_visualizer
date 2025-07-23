@@ -26,15 +26,10 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
-    # Resource limits
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-          cpus: '0.5'
-        reservations:
-          memory: 256M
-          cpus: '0.25'
+    # Resource limits (for standalone Docker)
+    mem_limit: 512M
+    memswap_limit: 512M
+    cpus: 0.5
     # Logging configuration
     logging:
       driver: json-file

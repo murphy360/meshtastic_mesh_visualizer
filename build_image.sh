@@ -95,8 +95,8 @@ function update_repository() {
 }
 
 function build_image() {
-    print_section "Building Docker Image"
-    
+    print_section "Building $IMAGE_NAME Docker Image"
+
     local build_args=(
         "--tag" "$IMAGE_NAME"
         "--label" "branch=$branch"
