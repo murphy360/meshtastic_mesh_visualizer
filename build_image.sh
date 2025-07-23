@@ -1,29 +1,168 @@
 #!/bin/bash
 
-image_name="meshtastic_mesh_visualizer"
+set -euo pipefail  # Exit on error, undefined vars, pipe failures
 
-# Argument check (Accepts branch name as an argument, defaults to main)
-branch=${1:-main}
+# Configuration
+readonly IMAGE_NAME="meshtastic_mesh_visualizer"
+readonly DOCKERFILE="Dockerfile"
+readonly DEFAULT_BRANCH="main"
+
+# Colors for output
+readonly RED='\033[0;31m'
+readonly GREEN='\033[0;32m'
+readonly YELLOW='\033[1;33m'
+readonly BLUE='\033[0;34m'
+readonly NC='\033[0m' # No Color
+
+# Argument handling
+branch=${1:-$DEFAULT_BRANCH}
 
 function print_section() {
-    printf "\n\n\n***************************************************\n"
-    printf "$1\n"
-    printf "***************************************************\n\n\n"
+    echo -e "\n${BLUE}=================================================${NC}"
+    echo -e "${BLUE}$1${NC}"
+    echo -e "${BLUE}=================================================${NC}\n"
 }
 
-# Checkout to the specified branch
-print_section "Checking out to the specified branch..."
-git fetch
-git checkout $branch
+function print_success() {
+    echo -e "${GREEN}✅ $1${NC}"
+}
 
-# Pull the latest changes from the repository
-print_section "Pulling the latest changes from the repository..."
-git pull
+function print_warning() {
+    echo -e "${YELLOW}⚠️  $1${NC}"
+}
 
-# Build the Docker image
-print_section "Building the Docker image..."
-docker build -t $image_name .
-docker image ls | grep $image_name
+function print_error() {
+    echo -e "${RED}❌ $1${NC}"
+    exit 1
+}
 
-print_section "Image build complete!"
-echo "Image name: $image_name"
+function validate_environment() {
+    print_section "Validating Environment"
+    
+    # Check if Docker is installed and running
+    if ! command -v docker &> /dev/null; then
+        print_error "Docker is not installed or not in PATH"
+    fi
+    
+    if ! docker info &> /dev/null; then
+        print_error "Docker daemon is not running"
+    fi
+    
+    # Check if Dockerfile exists
+    if [[ ! -f "$DOCKERFILE" ]]; then
+        print_error "Dockerfile not found in current directory"
+    fi
+    
+    # Check if requirements.txt exists
+    if [[ ! -f "requirements.txt" ]]; then
+        print_error "requirements.txt not found"
+    fi
+    
+    # Check if src directory exists
+    if [[ ! -d "src" ]]; then
+        print_error "src directory not found"
+    fi
+    
+    print_success "Environment validation passed"
+}
+
+function update_repository() {
+    print_section "Updating Repository to Branch: $branch"
+    
+    # Fetch latest changes
+    if ! git fetch; then
+        print_error "Failed to fetch from remote repository"
+    fi
+    
+    # Check if branch exists
+    if ! git show-ref --verify --quiet refs/heads/"$branch" && \
+       ! git show-ref --verify --quiet refs/remotes/origin/"$branch"; then
+        print_error "Branch '$branch' does not exist"
+    fi
+    
+    # Checkout to specified branch
+    if ! git checkout "$branch"; then
+        print_error "Failed to checkout branch '$branch'"
+    fi
+    
+    # Pull latest changes
+    if ! git pull origin "$branch"; then
+        print_warning "Failed to pull latest changes, continuing with current state"
+    fi
+    
+    local commit_hash=$(git rev-parse --short HEAD)
+    print_success "Repository updated to branch '$branch' (commit: $commit_hash)"
+}
+
+function build_image() {
+    print_section "Building Docker Image"
+    
+    local build_args=(
+        "--tag" "$IMAGE_NAME"
+        "--label" "branch=$branch"
+        "--label" "build-date=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
+        "--label" "git-commit=$(git rev-parse HEAD)"
+        "."
+    )
+    
+    echo "Building with command: docker build ${build_args[*]}"
+    
+    if docker build "${build_args[@]}"; then
+        print_success "Docker image built successfully"
+    else
+        print_error "Docker build failed"
+    fi
+}
+
+function show_image_info() {
+    print_section "Image Information"
+    
+    # Show image details
+    echo "Image details:"
+    docker images "$IMAGE_NAME" --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}"
+    
+    # Show image labels
+    echo -e "\nImage labels:"
+    docker inspect "$IMAGE_NAME" --format '{{range $k, $v := .Config.Labels}}{{$k}}: {{$v}}{{"\n"}}{{end}}'
+    
+    # Show image layers (summary)
+    echo -e "\nImage layers:"
+    docker history "$IMAGE_NAME" --format "table {{.CreatedBy}}\t{{.Size}}" --no-trunc=false | head -10
+}
+
+function cleanup_old_images() {
+    print_section "Cleaning Up Old Images"
+    
+    # Remove dangling images
+    local dangling_images=$(docker images -f "dangling=true" -q)
+    if [[ -n "$dangling_images" ]]; then
+        echo "Removing dangling images..."
+        docker rmi $dangling_images || print_warning "Failed to remove some dangling images"
+        print_success "Dangling images removed"
+    else
+        print_success "No dangling images to remove"
+    fi
+}
+
+function main() {
+    print_section "Meshtastic Mesh Visualizer - Docker Build"
+    echo "Branch: $branch"
+    echo "Image: $IMAGE_NAME"
+    echo "Dockerfile: $DOCKERFILE"
+    
+    validate_environment
+    update_repository
+    cleanup_old_images
+    build_image
+    show_image_info
+    
+    print_section "Build Complete!"
+    echo -e "${GREEN}Image '$IMAGE_NAME' built successfully from branch '$branch'${NC}"
+    echo -e "${BLUE}Next steps:${NC}"
+    echo "  • Test the image: docker run --rm -p 5000:5000 $IMAGE_NAME"
+    echo "  • Deploy with compose: docker compose up -d"
+    echo "  • View logs: docker logs $IMAGE_NAME"
+}
+
+# Run main function
+main "$@"

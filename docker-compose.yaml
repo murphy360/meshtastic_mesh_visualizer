@@ -1,10 +1,50 @@
+version: '3.8'
+
 services:
   mesh-visualizer:
     image: meshtastic_mesh_visualizer
     container_name: meshtastic_mesh_visualizer
+    restart: unless-stopped
     ports:
-      - 5000:5000
+      - "5000:5000"
     volumes:
-      - ~/mesh-monitor/data:/data
+      # Mount mesh monitor data directory
+      - ~/mesh-monitor/data:/data:ro
+      # Mount logs directory for persistence
+      - ./logs:/app/logs
     environment:
+      # Flask configuration
+      - FLASK_ENV=production
+      - FLASK_APP=app.py
+      # Data file location
       - MESH_DATA_FILE=/data/mesh_data.json
+      # Optional: Configure log level
+      - LOG_LEVEL=INFO
+    healthcheck:
+      test: ["CMD", "python", "-c", "import requests; requests.get('http://localhost:5000/', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '0.5'
+        reservations:
+          memory: 256M
+          cpus: '0.25'
+    # Logging configuration
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+    # Network configuration
+    networks:
+      - mesh-network
+
+networks:
+  mesh-network:
+    driver: bridge
