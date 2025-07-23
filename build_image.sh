@@ -117,17 +117,31 @@ function build_image() {
 function show_image_info() {
     print_section "Image Information"
     
-    # Show image details
+    # Show image details with error handling
     echo "Image details:"
-    docker images "$IMAGE_NAME" --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}"
+    if docker images "$IMAGE_NAME" --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}\t{{.CreatedAt}}" 2>/dev/null; then
+        echo ""
+    else
+        print_warning "Failed to show image details"
+    fi
     
-    # Show image labels
-    echo -e "\nImage labels:"
-    docker inspect "$IMAGE_NAME" --format '{{range $k, $v := .Config.Labels}}{{$k}}: {{$v}}{{"\n"}}{{end}}'
+    # Show basic image info as fallback
+    echo "Basic image info:"
+    if docker images "$IMAGE_NAME" 2>/dev/null; then
+        echo ""
+    else
+        print_warning "Failed to show basic image info"
+    fi
     
-    # Show image layers (summary)
-    echo -e "\nImage layers:"
-    docker history "$IMAGE_NAME" --format "table {{.CreatedBy}}\t{{.Size}}" --no-trunc=false | head -10
+    # Show image labels with error handling
+    echo "Image labels:"
+    if docker inspect "$IMAGE_NAME" --format '{{range $k, $v := .Config.Labels}}{{if ne $k "com.docker.compose.config-hash"}}{{$k}}: {{$v}}{{"\n"}}{{end}}{{end}}' 2>/dev/null; then
+        echo ""
+    else
+        print_warning "Failed to show image labels"
+    fi
+    
+    print_success "Image information displayed"
 }
 
 function cleanup_old_images() {
