@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   mesh-visualizer:
     image: meshtastic_mesh_visualizer
