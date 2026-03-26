@@ -4,12 +4,6 @@ Application settings and configuration
 import os
 from datetime import datetime
 
-"""
-Application settings and configuration
-"""
-import os
-from datetime import datetime
-
 # File paths - use test data for development on Windows
 if os.name == 'nt':  # Windows
     # Use test data directory relative to project root
