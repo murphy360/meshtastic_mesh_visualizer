@@ -70,10 +70,10 @@ class MapService:
             if not node.has_valid_position:
                 nodes_without_position.append(node)
             else:
-                self._add_node_to_map(m, node, time_thresholds)
+                self._add_node_to_map(m, node, time_thresholds, visibility_settings)
         
         # Always add the primary node
-        self._add_primary_node_to_map(m, primary_node, time_thresholds)
+        self._add_primary_node_to_map(m, primary_node, time_thresholds, visibility_settings)
         
         # Add connections
         self._add_connections_to_map(m, mesh_data, visibility_settings, time_thresholds)
@@ -89,8 +89,10 @@ class MapService:
         logging.info(f"Map created with {total_nodes_count - filtered_nodes_count} visible nodes, {filtered_nodes_count} filtered out")
         return m
     
-    def _add_node_to_map(self, m: folium.Map, node: MeshNode, time_thresholds: Dict[str, datetime]) -> None:
+    def _add_node_to_map(self, m: folium.Map, node: MeshNode, time_thresholds: Dict[str, datetime], visibility_settings: Optional[Dict[str, bool]] = None) -> None:
         """Add a node marker to the map"""
+        if visibility_settings is None:
+            visibility_settings = DEFAULT_VISIBILITY_SETTINGS.copy()
         last_heard_str = time_since_last_heard(node.last_heard_time) if node.last_heard_time else "N/A"
         
         # Create appropriate icon
@@ -117,8 +119,9 @@ class MapService:
         )
         marker.add_to(m)
         
-        # Add precision circle if available and recent
-        if (node.precision_bits and 
+        # Add precision circle if available, recent, and enabled in visibility settings
+        if (visibility_settings.get('show_range_rings', True) and
+            node.precision_bits and 
             node.last_heard_time and 
             node.last_heard_time > time_thresholds['one_day_ago']):
             
@@ -133,8 +136,10 @@ class MapService:
                     popup=popup_text
                 ).add_to(m)
     
-    def _add_primary_node_to_map(self, m: folium.Map, primary_node: MeshNode, time_thresholds: Dict[str, datetime]) -> None:
+    def _add_primary_node_to_map(self, m: folium.Map, primary_node: MeshNode, time_thresholds: Dict[str, datetime], visibility_settings: Optional[Dict[str, bool]] = None) -> None:
         """Add the primary node with special styling"""
+        if visibility_settings is None:
+            visibility_settings = DEFAULT_VISIBILITY_SETTINGS.copy()
         icon = folium.Icon(color=COLOR_PRIMARY_NODE, icon='star', prefix='fa')
         popup_text = f"{primary_node.id}<br>Altitude: {primary_node.alt}m"
         
@@ -145,8 +150,8 @@ class MapService:
         )
         marker.add_to(m)
         
-        # Add precision circle for primary node if available
-        if primary_node.precision_bits:
+        # Add precision circle for primary node if available and enabled in visibility settings
+        if visibility_settings.get('show_range_rings', True) and primary_node.precision_bits:
             radius = calculate_precision_radius(primary_node.precision_bits)
             if radius and radius > 0:
                 folium.Circle(

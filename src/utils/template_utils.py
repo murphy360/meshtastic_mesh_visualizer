@@ -77,7 +77,8 @@ def create_interactive_map_key_html(
                 <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings.get('show_receive_range_3hop', False))}</span>
                 <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE_3HOP}"></i>&nbsp;3-Hop Coverage (0-3 hops)
             </div>
-            <div style="margin: 2px 0; font-size: 12px;">
+            <div id="toggle-range-rings" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings.get('show_range_rings', True))}">
+                <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings.get('show_range_rings', True))}</span>
                 <i class="fa fa-circle-o" style="color:{COLOR_PRECISION_CIRCLE}"></i>&nbsp;Range Rings - Position Precision
             </div>
             <div style="font-size: 10px; color: gray; margin-left: 15px;">

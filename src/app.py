@@ -74,6 +74,7 @@ def parse_visibility_settings(args) -> dict:
         'show_receive_range_1hop': args.get('show_receive_range_1hop', 'false').lower() == 'true',
         'show_receive_range_2hop': args.get('show_receive_range_2hop', 'false').lower() == 'true',
         'show_receive_range_3hop': args.get('show_receive_range_3hop', 'false').lower() == 'true',
+        'show_range_rings': args.get('show_range_rings', 'true').lower() == 'true',
     }
 
 

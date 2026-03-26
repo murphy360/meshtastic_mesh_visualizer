@@ -35,7 +35,8 @@ DEFAULT_VISIBILITY_SETTINGS = {
     'show_receive_range': False,
     'show_receive_range_1hop': False,
     'show_receive_range_2hop': False,
-    'show_receive_range_3hop': False
+    'show_receive_range_3hop': False,
+    'show_range_rings': True
 }
 
 # Time thresholds
