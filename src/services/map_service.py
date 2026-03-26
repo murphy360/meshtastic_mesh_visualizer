@@ -119,12 +119,8 @@ class MapService:
         )
         marker.add_to(m)
         
-        # Add precision circle if available, recent, and enabled in visibility settings
-        if (visibility_settings.get('show_range_rings', True) and
-            node.precision_bits and 
-            node.last_heard_time and 
-            node.last_heard_time > time_thresholds['one_day_ago']):
-            
+        # Add precision circle if available and enabled in visibility settings
+        if visibility_settings.get('show_range_rings', True) and node.precision_bits:
             radius = calculate_precision_radius(node.precision_bits)
             if radius and radius > 0:
                 folium.Circle(
