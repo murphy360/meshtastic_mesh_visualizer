@@ -300,6 +300,11 @@ class MapService:
                 document.getElementById('toggle-receive-range-3hop')?.addEventListener('click', () => {{
                     this.toggleVisibility('receive_range_3hop', this.visibilitySettings.show_receive_range_3hop);
                 }});
+
+                // Range rings toggle
+                document.getElementById('toggle-range-rings')?.addEventListener('click', () => {{
+                    this.toggleVisibility('range_rings', this.visibilitySettings.show_range_rings);
+                }});
             }}
 
             toggleVisibility(group, currentState) {{
