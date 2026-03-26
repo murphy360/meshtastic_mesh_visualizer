@@ -1,21 +1,21 @@
 # Unified Meshtastic Mesh Monitor and Visualizer
 # Deploy both services with one command: docker-compose up -d --build
-
 services:
   # Meshtastic Mesh Monitor - Collects data from radio
   mesh-monitor:
+    image: meshtastic_mesh_monitor
+    container_name: meshtastic_mesh_monitor
     build:
       context: meshtastic_mesh_monitor
-      dockerfile: docker/Dockerfile.optimized
-    container_name: meshtastic_mesh_monitor
+      dockerfile: docker/Dockerfile
     restart: unless-stopped
     environment:
       # Radio connection (required)
-      - RADIO_IP=${RADIO_IP:-192.168.1.100}
-      - RADIO_PORT=${RADIO_PORT:-4403}
+      - TCP_SERVER=${TCP_SERVER:-192.168.68.73}
       
       # AI Configuration (optional but recommended)
       - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - GEMINI_MODEL=${GEMINI_MODEL:-gemini-2.5-flash}
       
       # Node position (optional)
       - NODE_LATITUDE=${NODE_LATITUDE}
@@ -27,16 +27,21 @@ services:
       - LOG_LEVEL=${LOG_LEVEL:-INFO}
     
     # USB device for serial connection (if using serial instead of TCP)
-    devices:
-      - ${SERIAL_DEVICE}:/dev/ttyUSB0:rw
+    # Uncomment and set SERIAL_DEVICE in .env to enable serial connections
+    # Example: SERIAL_DEVICE=/dev/ttyUSB0 or /dev/ttyACM0
+    # devices:
+    #   - ${SERIAL_DEVICE}:/dev/ttyUSB0:rw
+    
+    ports:
+      - 4403:4403
     
     volumes:
       # Shared data directory for IPC between monitor and visualizer
       - mesh_data:/data
       # Configuration directory
-      - ./meshtastic_mesh_monitor/config:/app/config:ro
-      # Logs directory
-      - ./mesh_monitor_logs:/app/logs
+      - ~/mesh-monitor/config:/app/config_files
+      # Logs directory (bind mount for host access via vim)
+      - ~/mesh-monitor/logs:/app/logs
     
     # Resource limits
     mem_limit: 256M
@@ -53,9 +58,9 @@ services:
     networks:
       - mesh-network
     
-    # Health check
+    # Health check - simple file existence check
     healthcheck:
-      test: ['CMD', 'python3', '-c', 'import sqlite3; sqlite3("/data/mesh.db").execute("SELECT 1")']
+      test: ['CMD-SHELL', 'ls /data > /dev/null && echo "ok"']
       interval: 30s
       timeout: 10s
       retries: 3
@@ -63,10 +68,11 @@ services:
 
   # Meshtastic Mesh Visualizer - Web UI to view mesh data
   mesh-visualizer:
+    image: meshtastic_mesh_visualizer
+    container_name: meshtastic_mesh_visualizer
     build:
       context: meshtastic_mesh_visualizer
       dockerfile: docker/Dockerfile
-    container_name: meshtastic_mesh_visualizer
     restart: unless-stopped
     
     # Wait for mesh-monitor to be healthy before starting
@@ -93,8 +99,8 @@ services:
     volumes:
       # Read mesh data from monitor
       - mesh_data:/data:ro
-      # Logs directory
-      - ./mesh_visualizer_logs:/app/logs
+      # Logs directory (bind mount for host access via vim)
+      - ~/mesh_visualizer/logs:/app/logs
     
     # Resource limits
     mem_limit: 512M
