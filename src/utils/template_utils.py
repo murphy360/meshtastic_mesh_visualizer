@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Dict, Any
 from config.colors import *
 from config.settings import *
+from utils.time_utils import time_since_last_heard
 
 
 def create_interactive_map_key_html(
@@ -148,7 +149,6 @@ def create_nodes_without_position_html(nodes_without_position: list) -> str:
     """
     
     for node in sorted_nodes:
-        from utils.time_utils import time_since_last_heard
         
         color = node.color
         icon_class = 'fa-plane' if node.is_aircraft else 'fa-map-marker'
