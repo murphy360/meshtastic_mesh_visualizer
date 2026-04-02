@@ -99,6 +99,9 @@ class MapService:
         if node.is_aircraft:
             icon = folium.Icon(color=node.color, icon='plane', prefix='fa')
             popup_text = f"✈️ {node.id} (Aircraft)<br>Altitude: {node.alt}m<br>Last Heard: {last_heard_str}"
+        elif node.is_infrastructure:
+            icon = folium.Icon(color=node.color, icon=ICON_INFRASTRUCTURE, prefix='fa')
+            popup_text = f"🖧 {node.id} (Router)<br>Altitude: {node.alt}m<br>Last Heard: {last_heard_str}"
         else:
             icon = folium.Icon(color=node.color)
             popup_text = f"{node.id}<br>Altitude: {node.alt}m<br>Last Heard: {last_heard_str}"

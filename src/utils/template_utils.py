@@ -8,6 +8,15 @@ from config.settings import *
 from utils.time_utils import time_since_last_heard
 
 
+def _get_node_icon_class(node) -> str:
+    """Get the Font Awesome icon class for a node based on its type"""
+    if node.is_aircraft:
+        return f'fa-{ICON_AIRCRAFT}'
+    elif node.is_infrastructure:
+        return f'fa-{ICON_INFRASTRUCTURE}'
+    return 'fa-map-marker'
+
+
 def create_interactive_map_key_html(
     primary_node_id: str,
     visibility_settings: Dict[str, bool],
@@ -39,6 +48,10 @@ def create_interactive_map_key_html(
             <div style="margin: 2px 0;">
                 <span style="font-size: 12px;">👁️</span>
                 <i class="fa fa-star" style="color:{COLOR_PRIMARY_NODE}"></i>&nbsp;{primary_node_id} (Always visible)
+            </div>
+            <div style="margin: 2px 0;">
+                <span style="font-size: 12px;">ℹ️</span>
+                <i class="fa fa-{ICON_INFRASTRUCTURE}" style="color:{COLOR_SEEN_LAST_HOUR}"></i>&nbsp;Router / Infrastructure Node
             </div>
             <div id="toggle-last-hour" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_last_hour'])}">
                 <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_last_hour'])}</span>
@@ -151,7 +164,7 @@ def create_nodes_without_position_html(nodes_without_position: list) -> str:
     for node in sorted_nodes:
         
         color = node.color
-        icon_class = 'fa-plane' if node.is_aircraft else 'fa-map-marker'
+        icon_class = _get_node_icon_class(node)
         hops_away_text = f"{node.hops_away}" if node.hops_away != -1 else "N/A"
         connections = ", ".join(node.connections)
         last_heard_str = time_since_last_heard(node.last_heard_time) if node.last_heard_time else "N/A"

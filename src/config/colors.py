@@ -10,6 +10,10 @@ COLOR_SEEN_LAST_WEEK = 'orange'
 COLOR_SEEN_OVER_WEEK = 'gray'
 COLOR_NO_LAST_HEARD = 'red'
 
+# Infrastructure node icon
+ICON_INFRASTRUCTURE = 'server'
+ICON_AIRCRAFT = 'plane'
+
 # Connection colors
 COLOR_CONNECTION_DEFAULT = 'green'
 COLOR_CONNECTION_NON_PRIMARY = 'gray'
