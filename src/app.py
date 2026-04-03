@@ -3,6 +3,7 @@ Flask application for Meshtastic mesh visualizer
 Refactored for better modularity and maintainability
 """
 import logging
+import os
 from datetime import datetime
 from flask import Flask, render_template, request, jsonify
 
@@ -43,6 +44,18 @@ def get_mesh_data_endpoint():
     """Return current mesh data as JSON for live updates"""
     data_service.read_mesh_data()
     return jsonify(data_service.get_mesh_data_summary())
+
+
+@app.route('/health')
+def health():
+    """Health check endpoint for Docker and monitoring"""
+    mesh_data = data_service.current_data
+    return jsonify({
+        "status": "ok",
+        "last_update": mesh_data.last_update,
+        "node_count": len(mesh_data.nodes),
+        "timestamp": datetime.now().isoformat()
+    })
 
 
 @app.route('/filter_map')
@@ -95,8 +108,9 @@ if __name__ == '__main__':
     file_monitor_service.start_background_refresh()
     
     try:
-        # Start Flask app
-        app.run(debug=True, host='0.0.0.0', port=5000)
+        # Start Flask app - disable debug mode in production
+        is_debug = os.getenv('FLASK_ENV') != 'production'
+        app.run(debug=is_debug, host='0.0.0.0', port=5000)
     finally:
         # Clean up background services
         file_monitor_service.stop_background_refresh()

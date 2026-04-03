@@ -260,6 +260,50 @@ class MapService:
             init() {{
                 this.setupToggleListeners();
                 this.startRefreshInterval();
+                this.restoreMapView();
+            }}
+
+            // Find the Leaflet map instance from the Folium-generated page
+            _getLeafletMap() {{
+                const mapEl = document.querySelector('.folium-map');
+                if (mapEl && mapEl._leaflet_id) {{
+                    // Access Leaflet's internal map registry
+                    for (const key of Object.keys(window)) {{
+                        const val = window[key];
+                        if (val && val._container === mapEl) return val;
+                    }}
+                }}
+                return null;
+            }}
+
+            // Save current map center/zoom to sessionStorage before navigating away
+            _saveMapView() {{
+                const map = this._getLeafletMap();
+                if (map) {{
+                    const center = map.getCenter();
+                    sessionStorage.setItem('meshMapView', JSON.stringify({{
+                        lat: center.lat, lng: center.lng, zoom: map.getZoom()
+                    }}));
+                }}
+            }}
+
+            // Restore map center/zoom from sessionStorage after page load
+            restoreMapView() {{
+                const saved = sessionStorage.getItem('meshMapView');
+                if (!saved) return;
+                try {{
+                    const view = JSON.parse(saved);
+                    // Small delay to let Folium finish initializing
+                    setTimeout(() => {{
+                        const map = this._getLeafletMap();
+                        if (map) {{
+                            map.setView([view.lat, view.lng], view.zoom);
+                            console.log('Restored map view:', view);
+                        }}
+                    }}, 100);
+                }} catch (e) {{
+                    console.warn('Could not restore map view:', e);
+                }}
             }}
 
             setupToggleListeners() {{
@@ -309,6 +353,7 @@ class MapService:
 
             toggleVisibility(group, currentState) {{
                 console.log('Toggling visibility for group:', group, 'current state:', currentState);
+                this._saveMapView();
                 
                 // Build URL with toggled state
                 const url = new URL('/filter_map', window.location.origin);
@@ -332,6 +377,18 @@ class MapService:
                 console.log('Smooth refresh enabled - updating every 10 seconds');
             }}
 
+            _showUpdateIndicator() {{
+                let indicator = document.getElementById('mesh-update-indicator');
+                if (!indicator) {{
+                    indicator = document.createElement('div');
+                    indicator.id = 'mesh-update-indicator';
+                    indicator.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#2196F3;color:white;padding:8px 20px;border-radius:4px;z-index:10000;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.3);transition:opacity 0.3s;';
+                    document.body.appendChild(indicator);
+                }}
+                indicator.textContent = 'Updating map...';
+                indicator.style.opacity = '1';
+            }}
+
             async refreshData() {{
                 try {{
                     const response = await fetch('/get_mesh_data');
@@ -346,6 +403,8 @@ class MapService:
                     // Check if actual node data has changed using hash
                     if (this.lastDataHash !== null && this.lastDataHash !== data.data_hash) {{
                         console.log('Node data changed, reloading map. Hash changed from', this.lastDataHash, 'to', data.data_hash);
+                        this._saveMapView();
+                        this._showUpdateIndicator();
                         window.location.reload();
                         return;
                     }}
@@ -363,6 +422,7 @@ class MapService:
                     this.refreshFailures++;
                     if (this.refreshFailures >= 3) {{
                         console.log('Multiple refresh failures, falling back to full page reload');
+                        this._saveMapView();
                         window.location.reload();
                     }}
                 }}
