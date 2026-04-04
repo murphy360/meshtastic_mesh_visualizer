@@ -17,6 +17,22 @@ def _get_node_icon_class(node) -> str:
     return 'fa-map-marker'
 
 
+def _circle_icon_svg(color_name: str, radius_px: int = 6) -> str:
+    """Generate an inline SVG circle matching the CircleMarker style on the map.
+    Returns an <svg> element sized to fit with matching fill and stroke color."""
+    hex_c = COLOR_HEX.get(color_name, COLOR_HEX.get('gray', '#7B7B7B'))
+    diam = max(radius_px * 2, 6)  # minimum 6px diameter for visibility in UI
+    svg_r = diam // 2
+    size = diam + 2  # 1px padding for stroke
+    cx = cy = size // 2
+    return (
+        f'<svg width="{size}" height="{size}" style="vertical-align:middle;">'
+        f'<circle cx="{cx}" cy="{cy}" r="{svg_r}" '
+        f'fill="{hex_c}" stroke="{hex_c}" stroke-width="1.5" fill-opacity="0.85"/>'
+        f'</svg>'
+    )
+
+
 def create_interactive_map_key_html(
     primary_node_id: str,
     visibility_settings: Dict[str, bool],
@@ -51,27 +67,27 @@ def create_interactive_map_key_html(
             </div>
             <div style="margin: 2px 0;">
                 <span style="font-size: 12px;">ℹ️</span>
-                <i class="fa fa-{ICON_INFRASTRUCTURE}" style="color:{COLOR_SEEN_LAST_HOUR}"></i>&nbsp;Router / Infrastructure Node
+                {_circle_icon_svg(COLOR_SEEN_LAST_HOUR, 8)}&nbsp;Router / Infrastructure Node
             </div>
             <div id="toggle-last-hour" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_last_hour'])}">
                 <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_last_hour'])}</span>
-                <i class="fa fa-map-marker" style="color:{COLOR_SEEN_LAST_HOUR}"></i>&nbsp;Last Hour ({age_group_counts['last_hour']})
+                {_circle_icon_svg(COLOR_SEEN_LAST_HOUR, MARKER_SIZE_BY_AGE['last_hour'])}&nbsp;Last Hour ({age_group_counts['last_hour']})
             </div>
             <div id="toggle-last-day" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_last_day'])}">
                 <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_last_day'])}</span>
-                <i class="fa fa-map-marker" style="color:{COLOR_SEEN_LAST_DAY}"></i>&nbsp;Last Day ({age_group_counts['last_day']})
+                {_circle_icon_svg(COLOR_SEEN_LAST_DAY, MARKER_SIZE_BY_AGE['last_day'])}&nbsp;Last Day ({age_group_counts['last_day']})
             </div>
             <div id="toggle-last-week" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_last_week'])}">
                 <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_last_week'])}</span>
-                <i class="fa fa-map-marker" style="color:{COLOR_SEEN_LAST_WEEK}"></i>&nbsp;Last Week ({age_group_counts['last_week']})
+                {_circle_icon_svg(COLOR_SEEN_LAST_WEEK, MARKER_SIZE_BY_AGE['last_week'])}&nbsp;Last Week ({age_group_counts['last_week']})
             </div>
             <div id="toggle-over-week" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_over_week'])}">
                 <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_over_week'])}</span>
-                <i class="fa fa-map-marker" style="color:{COLOR_SEEN_OVER_WEEK}"></i>&nbsp;Over Week Ago ({age_group_counts['over_week']})
+                {_circle_icon_svg(COLOR_SEEN_OVER_WEEK, MARKER_SIZE_BY_AGE['over_week'])}&nbsp;Over Week Ago ({age_group_counts['over_week']})
             </div>
             <div id="toggle-no-last-heard" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_no_last_heard'])}">
                 <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_no_last_heard'])}</span>
-                <i class="fa fa-map-marker" style="color:{COLOR_NO_LAST_HEARD}"></i>&nbsp;No Last Heard ({age_group_counts['no_last_heard']})
+                {_circle_icon_svg(COLOR_NO_LAST_HEARD, MARKER_SIZE_BY_AGE['no_last_heard'])}&nbsp;No Last Heard ({age_group_counts['no_last_heard']})
             </div>
         </div>
         <div style="margin-top: 8px; border-top: 1px solid #ccc; padding-top: 5px;">
@@ -218,7 +234,6 @@ def create_node_list_html(all_nodes: list, primary_node_id: str) -> str:
 
     for node in sorted_nodes:
         color = COLOR_PRIMARY_NODE if node.id == primary_node_id else node.color
-        icon_class = 'fa-star' if node.id == primary_node_id else _get_node_icon_class(node)
         last_heard_str = time_since_last_heard(node.last_heard_time) if node.last_heard_time else "N/A"
         hops_text = "—" if node.id == primary_node_id else (str(node.hops_away) if node.hops_away >= 0 else "?")
         has_pos = node.has_valid_position
@@ -232,10 +247,18 @@ def create_node_list_html(all_nodes: list, primary_node_id: str) -> str:
         no_pos_badge = "" if has_pos else " <span style='color:#aaa;font-size:10px;' title='No position data'>&#x26AB;</span>"
         hops_val = 0 if node.id == primary_node_id else (node.hops_away if node.hops_away >= 0 else 99)
 
+        # Use star icon for primary, circle icons matching map markers for others
+        if node.id == primary_node_id:
+            icon_td = f'<i class="fa fa-star" style="color:{COLOR_HEX.get(color, color)}"></i>'
+        else:
+            age = node.age_group
+            marker_r = MARKER_SIZE_BY_AGE.get(age, MARKER_SIZE_BY_AGE['over_week'])
+            icon_td = _circle_icon_svg(color, min(marker_r, 8))
+
         html += f"""
                 <tr class="node-row" data-node-id="{node.id}" data-has-pos="{'1' if has_pos else '0'}" data-hops="{hops_val}"
                     {click_handler} style="border-bottom:1px solid #eee;{cursor}{opacity}" {hover}>
-                    <td style="padding:4px 6px; width:20px;"><i class="fa {icon_class}" style="color:{color}"></i></td>
+                    <td style="padding:4px 6px; width:20px; text-align:center;">{icon_td}</td>
                     <td style="padding:4px 4px; font-weight:{'bold' if node.id == primary_node_id else 'normal'};">{node.id}{no_pos_badge}</td>
                     <td style="padding:4px 6px; color:#888; font-size:11px; text-align:right; white-space:nowrap;">{last_heard_str}</td>
                     <td style="padding:4px 6px; color:#888; font-size:11px; text-align:center; width:30px;" title="Hops">{hops_text}</td>
