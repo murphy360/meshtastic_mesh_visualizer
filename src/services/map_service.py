@@ -112,7 +112,7 @@ class MapService:
         # Determine age-based marker size
         age = node.age_group
         radius = MARKER_SIZE_BY_AGE.get(age, MARKER_SIZE_BY_AGE['over_week'])
-        hex_color = COLOR_HEX.get(node.color, COLOR_HEX.get('gray', '#7B7B7B'))
+        hex_color = COLOR_HEX.get(node.color, '#7B7B7B')
         
         # Pick a FontAwesome icon label for the tooltip
         if node.is_aircraft:
@@ -130,7 +130,7 @@ class MapService:
             fill=True,
             fill_color=hex_color,
             fill_opacity=0.85 if age == 'last_hour' else 0.7 if age == 'last_day' else 0.5,
-            weight=2 if age in ('last_hour', 'last_day') else 1,
+            weight=1,
             popup=popup_text,
             tooltip=f"{icon_char} {node.id}"
         )

@@ -56,11 +56,11 @@ NODE_LIST_SIDEBAR = {
 
 # Age-based marker sizing (radius in pixels for CircleMarker)
 MARKER_SIZE_BY_AGE = {
-    'last_hour': 12,
-    'last_day': 9,
-    'last_week': 6,
-    'over_week': 4,
-    'no_last_heard': 3
+    'last_hour': 10,
+    'last_day': 7,
+    'last_week': 4,
+    'over_week': 2,
+    'no_last_heard': 2
 }
 
 # Precision radius calculations (in meters)
