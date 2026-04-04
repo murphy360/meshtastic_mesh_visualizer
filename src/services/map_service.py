@@ -92,16 +92,13 @@ class MapService:
             visibility_settings = DEFAULT_VISIBILITY_SETTINGS.copy()
         last_heard_str = time_since_last_heard(node.last_heard_time) if node.last_heard_time else "N/A"
         
-        # Create appropriate icon
+        # Build popup text
         if node.is_aircraft:
-            icon = folium.Icon(color=node.color, icon='plane', prefix='fa')
             popup_text = f"✈️ {node.id} (Aircraft)<br>Altitude: {node.alt}m<br>Last Heard: {last_heard_str}"
         elif node.is_infrastructure:
             logging.info(f"Infrastructure node detected: {node.id} (role={node.role})")
-            icon = folium.Icon(color=node.color, icon=ICON_INFRASTRUCTURE, prefix='fa')
             popup_text = f"🖧 {node.id} (Router)<br>Altitude: {node.alt}m<br>Last Heard: {last_heard_str}"
         else:
-            icon = folium.Icon(color=node.color)
             popup_text = f"{node.id}<br>Altitude: {node.alt}m<br>Last Heard: {last_heard_str}"
         
         if node.hops_away != 0:
@@ -112,11 +109,30 @@ class MapService:
             logging.info(f"Node {node.id} has precision bits: {node.precision_bits}")
             popup_text += f"<br>Precision: {node.precision_bits} bits"
         
-        # Add marker
-        marker = folium.Marker(
+        # Determine age-based marker size
+        age = node.age_group
+        radius = MARKER_SIZE_BY_AGE.get(age, MARKER_SIZE_BY_AGE['over_week'])
+        hex_color = COLOR_HEX.get(node.color, COLOR_HEX.get('gray', '#7B7B7B'))
+        
+        # Pick a FontAwesome icon label for the tooltip
+        if node.is_aircraft:
+            icon_char = '✈'
+        elif node.is_infrastructure:
+            icon_char = '⛳'
+        else:
+            icon_char = '●'
+        
+        # Use CircleMarker for all age groups — size reflects recency
+        marker = folium.CircleMarker(
             location=[node.lat, node.lon],
+            radius=radius,
+            color=hex_color,
+            fill=True,
+            fill_color=hex_color,
+            fill_opacity=0.85 if age == 'last_hour' else 0.7 if age == 'last_day' else 0.5,
+            weight=2 if age in ('last_hour', 'last_day') else 1,
             popup=popup_text,
-            icon=icon
+            tooltip=f"{icon_char} {node.id}"
         )
         marker.add_to(m)
         

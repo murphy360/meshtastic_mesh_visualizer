@@ -49,3 +49,18 @@ HOP_RANGE_OPACITY = {
     2: 0.2,
     3: 0.15
 }
+
+# Hex color equivalents for DivIcon / CircleMarker usage
+COLOR_HEX = {
+    'green': '#2AAD27',
+    'blue': '#2A81CB',
+    'orange': '#CB8427',
+    'gray': '#7B7B7B',
+    'red': '#CB2B3E',
+    'purple': '#9C2BCB',
+    'darkgreen': '#1D8A2A',
+    'lightblue': '#5BC0DE',
+    'lightgreen': '#8BC34A',
+    'lightyellow': '#FFEB3B',
+    'lightcoral': '#F08080',
+}
