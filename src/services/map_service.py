@@ -329,27 +329,6 @@ class MapService:
             }}
 
             setupToggleListeners() {{
-                // Age group toggles
-                document.getElementById('toggle-last-hour')?.addEventListener('click', () => {{
-                    this.toggleVisibility('last_hour', this.visibilitySettings.show_last_hour);
-                }});
-
-                document.getElementById('toggle-last-day')?.addEventListener('click', () => {{
-                    this.toggleVisibility('last_day', this.visibilitySettings.show_last_day);
-                }});
-
-                document.getElementById('toggle-last-week')?.addEventListener('click', () => {{
-                    this.toggleVisibility('last_week', this.visibilitySettings.show_last_week);
-                }});
-
-                document.getElementById('toggle-over-week')?.addEventListener('click', () => {{
-                    this.toggleVisibility('over_week', this.visibilitySettings.show_over_week);
-                }});
-
-                document.getElementById('toggle-no-last-heard')?.addEventListener('click', () => {{
-                    this.toggleVisibility('no_last_heard', this.visibilitySettings.show_no_last_heard);
-                }});
-
                 // Coverage polygon toggles
                 document.getElementById('toggle-receive-range')?.addEventListener('click', () => {{
                     this.toggleVisibility('receive_range', this.visibilitySettings.show_receive_range);
@@ -464,13 +443,12 @@ class MapService:
     
     def _add_node_list_panel(self, m: folium.Map, mesh_data: MeshData, visibility_settings: Dict[str, bool]) -> None:
         """Add a collapsible node list panel to the map"""
-        visible_nodes = [mesh_data.primary_node] if mesh_data.primary_node else []
-        for node in mesh_data.secondary_nodes:
-            if node.should_show(visibility_settings):
-                visible_nodes.append(node)
+        # Include ALL nodes in the list — time filtering is done client-side
+        all_nodes = [mesh_data.primary_node] if mesh_data.primary_node else []
+        all_nodes.extend(mesh_data.secondary_nodes)
         
         primary_id = mesh_data.primary_node.id if mesh_data.primary_node else ""
-        node_list_html = create_node_list_html(visible_nodes, primary_id)
+        node_list_html = create_node_list_html(all_nodes, primary_id, visibility_settings)
         m.get_root().html.add_child(folium.Element(node_list_html))
     
     def _add_sitrep_data(self, m: folium.Map, mesh_data: MeshData) -> None:

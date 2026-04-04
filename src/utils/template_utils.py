@@ -57,40 +57,25 @@ def create_interactive_map_key_html(
     key_html = f"""
     <div style="position: fixed; 
                 bottom: {MAP_KEY_POSITION['bottom']}; right: {MAP_KEY_POSITION['right']}; 
-                width: {MAP_KEY_POSITION['width']}; height: {MAP_KEY_POSITION['height']}; 
+                width: {MAP_KEY_POSITION['width']}; height: auto; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
-        <b>Key - Click to Toggle Visibility</b><br>
+        <b>Map Key</b><br>
         <div style="margin-top: 5px;">
             <div style="margin: 2px 0;">
-                <span style="font-size: 12px;">👁️</span>
-                <i class="fa fa-star" style="color:{COLOR_PRIMARY_NODE}"></i>&nbsp;{primary_node_id} (Always visible)
+                <i class="fa fa-star" style="color:{COLOR_PRIMARY_NODE}"></i>&nbsp;{primary_node_id} (Primary)
             </div>
             <div style="margin: 2px 0;">
-                <span style="font-size: 12px;">ℹ️</span>
-                {_circle_icon_svg(COLOR_SEEN_LAST_HOUR, 8)}&nbsp;Router / Infrastructure Node
+                {_circle_icon_svg(COLOR_SEEN_LAST_HOUR, MARKER_SIZE_BY_AGE['last_hour'])}&nbsp;Last Hour
+                &nbsp;{_circle_icon_svg(COLOR_SEEN_LAST_DAY, MARKER_SIZE_BY_AGE['last_day'])}&nbsp;Last Day
+                &nbsp;{_circle_icon_svg(COLOR_SEEN_LAST_WEEK, MARKER_SIZE_BY_AGE['last_week'])}&nbsp;Last Week
             </div>
-            <div id="toggle-last-hour" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_last_hour'])}">
-                <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_last_hour'])}</span>
-                {_circle_icon_svg(COLOR_SEEN_LAST_HOUR, MARKER_SIZE_BY_AGE['last_hour'])}&nbsp;Last Hour ({age_group_counts['last_hour']})
-            </div>
-            <div id="toggle-last-day" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_last_day'])}">
-                <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_last_day'])}</span>
-                {_circle_icon_svg(COLOR_SEEN_LAST_DAY, MARKER_SIZE_BY_AGE['last_day'])}&nbsp;Last Day ({age_group_counts['last_day']})
-            </div>
-            <div id="toggle-last-week" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_last_week'])}">
-                <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_last_week'])}</span>
-                {_circle_icon_svg(COLOR_SEEN_LAST_WEEK, MARKER_SIZE_BY_AGE['last_week'])}&nbsp;Last Week ({age_group_counts['last_week']})
-            </div>
-            <div id="toggle-over-week" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_over_week'])}">
-                <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_over_week'])}</span>
-                {_circle_icon_svg(COLOR_SEEN_OVER_WEEK, MARKER_SIZE_BY_AGE['over_week'])}&nbsp;Over Week Ago ({age_group_counts['over_week']})
-            </div>
-            <div id="toggle-no-last-heard" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings['show_no_last_heard'])}">
-                <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings['show_no_last_heard'])}</span>
-                {_circle_icon_svg(COLOR_NO_LAST_HEARD, MARKER_SIZE_BY_AGE['no_last_heard'])}&nbsp;No Last Heard ({age_group_counts['no_last_heard']})
+            <div style="margin: 2px 0;">
+                {_circle_icon_svg(COLOR_SEEN_OVER_WEEK, MARKER_SIZE_BY_AGE['over_week'])}&nbsp;Older
+                &nbsp;{_circle_icon_svg(COLOR_NO_LAST_HEARD, MARKER_SIZE_BY_AGE['no_last_heard'])}&nbsp;No Last Heard
             </div>
         </div>
         <div style="margin-top: 8px; border-top: 1px solid #ccc; padding-top: 5px;">
+            <b style="font-size:12px;">Coverage &amp; Overlays</b>
             <div id="toggle-receive-range" style="margin: 2px 0; cursor: pointer; {get_opacity_style(visibility_settings.get('show_receive_range', False))}">
                 <span style="font-size: 12px;">{get_visibility_indicator(visibility_settings.get('show_receive_range', False))}</span>
                 <i class="fa fa-circle-o" style="color:{COLOR_RECEIVE_RANGE}"></i>&nbsp;0-Hop Coverage (direct only)
@@ -144,9 +129,25 @@ def create_sitrep_html(sitrep_time: str, sitrep_lines: list) -> str:
     return sitrep_html
 
 
-def create_node_list_html(all_nodes: list, primary_node_id: str) -> str:
+def create_node_list_html(all_nodes: list, primary_node_id: str, visibility_settings: dict = None) -> str:
     """Generate HTML for the collapsible node list panel"""
     import json as _json
+
+    # Determine active time filter from visibility settings
+    if visibility_settings:
+        # Figure out which cumulative level is active
+        if visibility_settings.get('show_over_week') or visibility_settings.get('show_no_last_heard'):
+            active_time = 'all'
+        elif visibility_settings.get('show_last_week'):
+            active_time = 'last_week'
+        elif visibility_settings.get('show_last_day'):
+            active_time = 'last_day'
+        elif visibility_settings.get('show_last_hour'):
+            active_time = 'last_hour'
+        else:
+            active_time = 'all'
+    else:
+        active_time = 'all'
 
     # Sort: primary first, then by last heard (most recent first), then by hops
     def sort_key(node):
@@ -210,6 +211,23 @@ def create_node_list_html(all_nodes: list, primary_node_id: str) -> str:
         .node-filter-chip:hover {{ border-color: #999; }}
         .node-filter-chip.active {{ background: #e3f2fd; border-color: #2196F3; color: #1565C0; }}
         #node-list-count {{ color: #888; font-size: 11px; margin-left: 4px; }}
+        .time-filter-section {{
+            padding: 6px 10px; border-bottom: 1px solid #ddd;
+            background: #fafafa; flex-shrink: 0;
+        }}
+        .time-filter-section label {{
+            font-size: 11px; font-weight: bold; color: #555; display: block; margin-bottom: 4px;
+        }}
+        .time-filter-row {{
+            display: flex; gap: 4px; flex-wrap: wrap;
+        }}
+        .time-filter-chip {{
+            font-size: 11px; padding: 3px 10px; border: 1px solid #ccc;
+            border-radius: 12px; background: white; cursor: pointer;
+            user-select: none; white-space: nowrap; transition: all 0.15s;
+        }}
+        .time-filter-chip:hover {{ border-color: #999; }}
+        .time-filter-chip.active {{ background: #e8f5e9; border-color: #4CAF50; color: #2E7D32; }}
     </style>
     <div id="node-list-panel">
         <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px;
@@ -226,6 +244,15 @@ def create_node_list_html(all_nodes: list, primary_node_id: str) -> str:
                 <span class="node-filter-chip" data-filter="has-position" onclick="window._applyFilter('has-position',this)">Has Position</span>
                 <span class="node-filter-chip" data-filter="no-position" onclick="window._applyFilter('no-position',this)">No Position</span>
                 <span class="node-filter-chip" data-filter="direct" onclick="window._applyFilter('direct',this)">Direct (0-1 hop)</span>
+            </div>
+        </div>
+        <div class="time-filter-section">
+            <label>\\U0001f552 Time Filter</label>
+            <div class="time-filter-row">
+                <span class="time-filter-chip{' active' if active_time == 'last_hour' else ''}" data-time="last_hour" onclick="window._applyTimeFilter('last_hour',this)">Last Hour</span>
+                <span class="time-filter-chip{' active' if active_time == 'last_day' else ''}" data-time="last_day" onclick="window._applyTimeFilter('last_day',this)">Last Day</span>
+                <span class="time-filter-chip{' active' if active_time == 'last_week' else ''}" data-time="last_week" onclick="window._applyTimeFilter('last_week',this)">Last Week</span>
+                <span class="time-filter-chip{' active' if active_time == 'all' else ''}" data-time="all" onclick="window._applyTimeFilter('all',this)">All Time</span>
             </div>
         </div>
         <div id="node-list-body" style="overflow-y:auto; flex:1; padding:4px 0;">
@@ -246,17 +273,17 @@ def create_node_list_html(all_nodes: list, primary_node_id: str) -> str:
         opacity = "" if has_pos else "opacity:0.55;"
         no_pos_badge = "" if has_pos else " <span style='color:#aaa;font-size:10px;' title='No position data'>&#x26AB;</span>"
         hops_val = 0 if node.id == primary_node_id else (node.hops_away if node.hops_away >= 0 else 99)
+        age = node.age_group if node.id != primary_node_id else 'primary'
 
         # Use star icon for primary, circle icons matching map markers for others
         if node.id == primary_node_id:
             icon_td = f'<i class="fa fa-star" style="color:{COLOR_HEX.get(color, color)}"></i>'
         else:
-            age = node.age_group
             marker_r = MARKER_SIZE_BY_AGE.get(age, MARKER_SIZE_BY_AGE['over_week'])
             icon_td = _circle_icon_svg(color, min(marker_r, 8))
 
         html += f"""
-                <tr class="node-row" data-node-id="{node.id}" data-has-pos="{'1' if has_pos else '0'}" data-hops="{hops_val}"
+                <tr class="node-row" data-node-id="{node.id}" data-has-pos="{'1' if has_pos else '0'}" data-hops="{hops_val}" data-age="{age}"
                     {click_handler} style="border-bottom:1px solid #eee;{cursor}{opacity}" {hover}>
                     <td style="padding:4px 6px; width:20px; text-align:center;">{icon_td}</td>
                     <td style="padding:4px 4px; font-weight:{'bold' if node.id == primary_node_id else 'normal'};">{node.id}{no_pos_badge}</td>
@@ -293,6 +320,15 @@ def create_node_list_html(all_nodes: list, primary_node_id: str) -> str:
 
     /* ---------- Filter state ---------- */
     window._activeFilter = 'all';
+    window._activeTimeFilter = '{active_time}';
+
+    /* ---------- Age groups included at each cumulative level ---------- */
+    window._timeFilterGroups = {{
+        'last_hour': ['last_hour'],
+        'last_day':  ['last_hour', 'last_day'],
+        'last_week': ['last_hour', 'last_day', 'last_week'],
+        'all':       ['last_hour', 'last_day', 'last_week', 'over_week', 'no_last_heard', 'primary']
+    }};
 
     window._applyFilter = function(filter, chip) {{
         window._activeFilter = filter;
@@ -301,27 +337,58 @@ def create_node_list_html(all_nodes: list, primary_node_id: str) -> str:
         window._filterNodeList();
     }};
 
-    /* ---------- Combined search + filter ---------- */
+    /* ---------- Time filter — triggers server reload for map ---------- */
+    window._applyTimeFilter = function(timeLevel, chip) {{
+        // Save map view before reload
+        if (window.meshMapController) window.meshMapController._saveMapView();
+
+        // Build the visibility settings for the server
+        var url = new URL('/filter_map', window.location.origin);
+
+        // Carry over non-time visibility settings from current page
+        var vs = window.visibilitySettings || {{}};
+        url.searchParams.set('show_receive_range', (vs.show_receive_range || false).toString());
+        url.searchParams.set('show_receive_range_1hop', (vs.show_receive_range_1hop || false).toString());
+        url.searchParams.set('show_receive_range_2hop', (vs.show_receive_range_2hop || false).toString());
+        url.searchParams.set('show_receive_range_3hop', (vs.show_receive_range_3hop || false).toString());
+        url.searchParams.set('show_range_rings', (vs.show_range_rings !== false).toString());
+
+        // Set cumulative time visibility
+        var groups = window._timeFilterGroups[timeLevel] || window._timeFilterGroups['all'];
+        url.searchParams.set('show_last_hour', groups.includes('last_hour').toString());
+        url.searchParams.set('show_last_day', groups.includes('last_day').toString());
+        url.searchParams.set('show_last_week', groups.includes('last_week').toString());
+        url.searchParams.set('show_over_week', groups.includes('over_week').toString());
+        url.searchParams.set('show_no_last_heard', groups.includes('no_last_heard').toString());
+
+        window.location.href = url.toString();
+    }};
+
+    /* ---------- Combined search + property + time filter ---------- */
     window._filterNodeList = function() {{
         var query = (document.getElementById('node-search-input').value || '').trim().toUpperCase();
         var filter = window._activeFilter;
+        var timeFilter = window._activeTimeFilter;
+        var allowedAges = window._timeFilterGroups[timeFilter] || window._timeFilterGroups['all'];
         var rows = document.querySelectorAll('.node-row');
         var shown = 0;
         rows.forEach(function(row) {{
             var nodeId = row.getAttribute('data-node-id') || '';
             var hasPos = row.getAttribute('data-has-pos') === '1';
             var hops = parseInt(row.getAttribute('data-hops') || '99', 10);
+            var age = row.getAttribute('data-age') || '';
             var matchSearch = !query || nodeId.toUpperCase().indexOf(query) !== -1;
             var matchFilter = true;
             if (filter === 'has-position') matchFilter = hasPos;
             else if (filter === 'no-position') matchFilter = !hasPos;
             else if (filter === 'direct') matchFilter = hops <= 1;
-            row.style.display = (matchSearch && matchFilter) ? '' : 'none';
-            if (matchSearch && matchFilter) shown++;
+            var matchTime = allowedAges.indexOf(age) !== -1;
+            row.style.display = (matchSearch && matchFilter && matchTime) ? '' : 'none';
+            if (matchSearch && matchFilter && matchTime) shown++;
         }});
         var countEl = document.getElementById('node-list-count');
         if (countEl) {{
-            if (query || filter !== 'all') {{
+            if (query || filter !== 'all' || timeFilter !== 'all') {{
                 countEl.textContent = ' (showing ' + shown + ')';
             }} else {{
                 countEl.textContent = '';
@@ -345,6 +412,8 @@ def create_node_list_html(all_nodes: list, primary_node_id: str) -> str:
                 }}
             }}
         }});
+        // Apply initial filter on load (so time filter is reflected in the list)
+        window._filterNodeList();
     }})();
     </script>
     """
