@@ -113,27 +113,52 @@ class MapService:
         age = node.age_group
         radius = MARKER_SIZE_BY_AGE.get(age, MARKER_SIZE_BY_AGE['over_week'])
         hex_color = COLOR_HEX.get(node.color, '#7B7B7B')
+        fill_opacity = 0.85 if age == 'last_hour' else 0.7 if age == 'last_day' else 0.5
         
         # Pick a FontAwesome icon label for the tooltip
         if node.is_aircraft:
             icon_char = '✈'
         elif node.is_infrastructure:
-            icon_char = '⛳'
+            icon_char = '◆'
         else:
             icon_char = '●'
         
-        # Use CircleMarker for all age groups — size reflects recency
-        marker = folium.CircleMarker(
-            location=[node.lat, node.lon],
-            radius=radius,
-            color=hex_color,
-            fill=True,
-            fill_color=hex_color,
-            fill_opacity=0.85 if age == 'last_hour' else 0.7 if age == 'last_day' else 0.5,
-            weight=1,
-            popup=popup_text,
-            tooltip=f"{icon_char} {node.id}"
-        )
+        if node.is_infrastructure:
+            # Diamond marker for infrastructure/router nodes
+            size = max(radius * 2 + 4, 10)
+            cx = cy = size // 2
+            r = radius
+            points = f"{cx},{cy - r} {cx + r},{cy} {cx},{cy + r} {cx - r},{cy}"
+            diamond_html = (
+                f'<svg width="{size}" height="{size}">'
+                f'<polygon points="{points}" '
+                f'fill="{hex_color}" stroke="{hex_color}" stroke-width="1" fill-opacity="{fill_opacity}"/>'
+                f'</svg>'
+            )
+            icon = folium.DivIcon(
+                icon_size=(size, size),
+                icon_anchor=(cx, cy),
+                html=diamond_html
+            )
+            marker = folium.Marker(
+                location=[node.lat, node.lon],
+                icon=icon,
+                popup=popup_text,
+                tooltip=f"{icon_char} {node.id}"
+            )
+        else:
+            # Circle marker for regular nodes
+            marker = folium.CircleMarker(
+                location=[node.lat, node.lon],
+                radius=radius,
+                color=hex_color,
+                fill=True,
+                fill_color=hex_color,
+                fill_opacity=fill_opacity,
+                weight=1,
+                popup=popup_text,
+                tooltip=f"{icon_char} {node.id}"
+            )
         marker.add_to(m)
         
         # Add precision circle if available and enabled in visibility settings

@@ -33,6 +33,21 @@ def _circle_icon_svg(color_name: str, radius_px: int = 6) -> str:
     )
 
 
+def _diamond_icon_svg(color_name: str, radius_px: int = 6) -> str:
+    """Generate an inline SVG diamond for infrastructure/router nodes."""
+    hex_c = COLOR_HEX.get(color_name, COLOR_HEX.get('gray', '#7B7B7B'))
+    r = max(radius_px, 3)
+    size = r * 2 + 2
+    cx = cy = size // 2
+    points = f"{cx},{cy - r} {cx + r},{cy} {cx},{cy + r} {cx - r},{cy}"
+    return (
+        f'<svg width="{size}" height="{size}" style="vertical-align:middle;">'
+        f'<polygon points="{points}" '
+        f'fill="{hex_c}" stroke="{hex_c}" stroke-width="1.5" fill-opacity="0.85"/>'
+        f'</svg>'
+    )
+
+
 def create_interactive_map_key_html(
     primary_node_id: str,
     visibility_settings: Dict[str, bool],
@@ -72,6 +87,9 @@ def create_interactive_map_key_html(
             <div style="margin: 2px 0;">
                 {_circle_icon_svg(COLOR_SEEN_OVER_WEEK, MARKER_SIZE_BY_AGE['over_week'])}&nbsp;Older
                 &nbsp;{_circle_icon_svg(COLOR_NO_LAST_HEARD, MARKER_SIZE_BY_AGE['no_last_heard'])}&nbsp;No Last Heard
+            </div>
+            <div style="margin: 2px 0;">
+                {_diamond_icon_svg(COLOR_SEEN_LAST_HOUR, 6)}&nbsp;Infrastructure (Router/Repeater)
             </div>
         </div>
         <div style="margin-top: 8px; border-top: 1px solid #ccc; padding-top: 5px;">
@@ -275,9 +293,12 @@ def create_node_list_html(all_nodes: list, primary_node_id: str, visibility_sett
         hops_val = 0 if node.id == primary_node_id else (node.hops_away if node.hops_away >= 0 else 99)
         age = node.age_group if node.id != primary_node_id else 'primary'
 
-        # Use star icon for primary, circle icons matching map markers for others
+        # Use star icon for primary, diamond for infrastructure, circle for others
         if node.id == primary_node_id:
             icon_td = f'<i class="fa fa-star" style="color:{COLOR_HEX.get(color, color)}"></i>'
+        elif node.is_infrastructure:
+            marker_r = MARKER_SIZE_BY_AGE.get(age, MARKER_SIZE_BY_AGE['over_week'])
+            icon_td = _diamond_icon_svg(color, min(marker_r, 8))
         else:
             marker_r = MARKER_SIZE_BY_AGE.get(age, MARKER_SIZE_BY_AGE['over_week'])
             icon_td = _circle_icon_svg(color, min(marker_r, 8))
