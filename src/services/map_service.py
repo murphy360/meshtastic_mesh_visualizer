@@ -294,20 +294,23 @@ class MapService:
             // Restore map center/zoom from sessionStorage after page load
             restoreMapView() {{
                 const saved = sessionStorage.getItem('meshMapView');
-                if (!saved) return;
-                try {{
-                    const view = JSON.parse(saved);
-                    // Small delay to let Folium finish initializing
-                    setTimeout(() => {{
-                        const map = this._getLeafletMap();
-                        if (map) {{
-                            map.setView([view.lat, view.lng], view.zoom);
-                            console.log('Restored map view:', view);
+                // Small delay to let Folium finish initializing
+                setTimeout(() => {{
+                    const map = this._getLeafletMap();
+                    if (map) {{
+                        // Notify Leaflet the container size changed (sidebar layout)
+                        map.invalidateSize();
+                        if (saved) {{
+                            try {{
+                                const view = JSON.parse(saved);
+                                map.setView([view.lat, view.lng], view.zoom);
+                                console.log('Restored map view:', view);
+                            }} catch (e) {{
+                                console.warn('Could not restore map view:', e);
+                            }}
                         }}
-                    }}, 100);
-                }} catch (e) {{
-                    console.warn('Could not restore map view:', e);
-                }}
+                    }}
+                }}, 100);
             }}
 
             setupToggleListeners() {{
@@ -464,8 +467,9 @@ class MapService:
             if node.has_valid_position:
                 node_positions[node.id] = [node.lat, node.lon]
         
+        sidebar_w = NODE_LIST_SIDEBAR['width']
         search_html = f"""
-        <div id="node-search-box" style="position:fixed; top:10px; left:50%; transform:translateX(-50%);
+        <div id="node-search-box" style="position:fixed; top:10px; left:calc({sidebar_w} + (100% - {sidebar_w}) / 2); transform:translateX(-50%);
              z-index:10000; background:white; border:2px solid #666; border-radius:6px;
              padding:6px 10px; box-shadow:0 2px 8px rgba(0,0,0,0.3); display:flex; gap:6px; align-items:center;">
             <i class="fa fa-search" style="color:#888;"></i>

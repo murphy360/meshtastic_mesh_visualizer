@@ -158,24 +158,29 @@ def create_node_list_html(all_nodes: list, primary_node_id: str) -> str:
         if node.has_valid_position:
             node_positions[node.id] = [node.lat, node.lon]
 
-    pos = NODE_LIST_POSITION
+    sidebar_w = NODE_LIST_SIDEBAR['width']
     html = f"""
-    <div id="node-list-panel" style="position:fixed; top:{pos['top']}; left:{pos['left']};
-         width:{pos['width']}; max-height:{pos['max_height']}; background:white; border:2px solid grey;
-         z-index:9998; font-size:13px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.2);
-         display:flex; flex-direction:column;">
-        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px;
-             border-bottom:1px solid #ddd; background:#f8f8f8; border-radius:4px 4px 0 0;">
+    <style>
+        #node-list-panel {{
+            position: fixed; top: 0; left: 0; bottom: 0;
+            width: {sidebar_w};
+            background: white; border-right: 2px solid #ccc;
+            z-index: 9998; font-size: 13px;
+            display: flex; flex-direction: column;
+            box-shadow: 2px 0 8px rgba(0,0,0,0.15);
+        }}
+        /* Push the Folium map to the right of the sidebar */
+        .folium-map {{
+            margin-left: {sidebar_w} !important;
+            width: calc(100% - {sidebar_w}) !important;
+        }}
+    </style>
+    <div id="node-list-panel">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px;
+             border-bottom:1px solid #ddd; background:#f8f8f8; flex-shrink:0;">
             <b>\U0001f4e1 Nodes ({len(sorted_nodes)})</b>
-            <button id="node-list-toggle" onclick="
-                var body=document.getElementById('node-list-body');
-                var btn=this;
-                if(body.style.display==='none'){{body.style.display='block';btn.textContent='\u25BC';}}
-                else{{body.style.display='none';btn.textContent='\u25B6';}}
-            " style="border:1px solid #ccc; border-radius:3px; background:white; cursor:pointer;
-                    padding:2px 6px; font-size:12px;">\u25BC</button>
         </div>
-        <div id="node-list-body" style="overflow-y:auto; padding:4px 0;">
+        <div id="node-list-body" style="overflow-y:auto; flex:1; padding:4px 0;">
             <table style="width:100%; border-collapse:collapse;">
     """
 

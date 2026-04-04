@@ -50,11 +50,8 @@ SITREP_POSITION = {
     'width': '300px'
 }
 
-NODE_LIST_POSITION = {
-    'top': '50px',
-    'left': '50px',
-    'width': '320px',
-    'max_height': '45vh'
+NODE_LIST_SIDEBAR = {
+    'width': '300px'
 }
 
 # Precision radius calculations (in meters)
