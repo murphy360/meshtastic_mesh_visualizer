@@ -169,16 +169,48 @@ def create_node_list_html(all_nodes: list, primary_node_id: str) -> str:
             display: flex; flex-direction: column;
             box-shadow: 2px 0 8px rgba(0,0,0,0.15);
         }}
-        /* Push the Folium map to the right of the sidebar */
         .folium-map {{
             margin-left: {sidebar_w} !important;
             width: calc(100% - {sidebar_w}) !important;
         }}
+        #node-search-input {{
+            width: 100%; border: 1px solid #ccc; border-radius: 4px;
+            padding: 5px 8px 5px 28px; font-size: 13px; outline: none;
+            box-sizing: border-box;
+        }}
+        #node-search-input:focus {{ border-color: #2196F3; }}
+        #node-filter-section {{
+            padding: 8px 10px; border-bottom: 1px solid #ddd;
+            background: #fafafa; flex-shrink: 0;
+        }}
+        .node-filter-row {{
+            display: flex; gap: 6px; margin-top: 6px; flex-wrap: wrap;
+        }}
+        .node-filter-chip {{
+            font-size: 11px; padding: 2px 8px; border: 1px solid #ccc;
+            border-radius: 12px; background: white; cursor: pointer;
+            user-select: none; white-space: nowrap; transition: all 0.15s;
+        }}
+        .node-filter-chip:hover {{ border-color: #999; }}
+        .node-filter-chip.active {{ background: #e3f2fd; border-color: #2196F3; color: #1565C0; }}
+        #node-list-count {{ color: #888; font-size: 11px; margin-left: 4px; }}
     </style>
     <div id="node-list-panel">
         <div style="display:flex; justify-content:space-between; align-items:center; padding:10px 12px;
              border-bottom:1px solid #ddd; background:#f8f8f8; flex-shrink:0;">
-            <b>\U0001f4e1 Nodes ({len(sorted_nodes)})</b>
+            <span><b>\\U0001f4e1 Nodes ({len(sorted_nodes)})</b><span id="node-list-count"></span></span>
+        </div>
+        <div id="node-filter-section">
+            <div style="position:relative;">
+                <i class="fa fa-search" style="position:absolute; left:8px; top:7px; color:#999; font-size:12px;"></i>
+                <input id="node-search-input" type="text" placeholder="Search nodes...">
+            </div>
+            <div class="node-filter-row">
+                <span class="node-filter-chip active" data-filter="all" onclick="window._applyFilter('all',this)">All</span>
+                <span class="node-filter-chip" data-filter="has-position" onclick="window._applyFilter('has-position',this)">Has Position</span>
+                <span class="node-filter-chip" data-filter="no-position" onclick="window._applyFilter('no-position',this)">No Position</span>
+                <span class="node-filter-chip" data-filter="direct" onclick="window._applyFilter('direct',this)">Direct (0-1 hop)</span>
+            </div>
         </div>
         <div id="node-list-body" style="overflow-y:auto; flex:1; padding:4px 0;">
             <table style="width:100%; border-collapse:collapse;">
@@ -198,9 +230,11 @@ def create_node_list_html(all_nodes: list, primary_node_id: str) -> str:
             hover = ''
         opacity = "" if has_pos else "opacity:0.55;"
         no_pos_badge = "" if has_pos else " <span style='color:#aaa;font-size:10px;' title='No position data'>&#x26AB;</span>"
+        hops_val = 0 if node.id == primary_node_id else (node.hops_away if node.hops_away >= 0 else 99)
 
         html += f"""
-                <tr {click_handler} style="border-bottom:1px solid #eee;{cursor}{opacity}" {hover}>
+                <tr class="node-row" data-node-id="{node.id}" data-has-pos="{'1' if has_pos else '0'}" data-hops="{hops_val}"
+                    {click_handler} style="border-bottom:1px solid #eee;{cursor}{opacity}" {hover}>
                     <td style="padding:4px 6px; width:20px;"><i class="fa {icon_class}" style="color:{color}"></i></td>
                     <td style="padding:4px 4px; font-weight:{'bold' if node.id == primary_node_id else 'normal'};">{node.id}{no_pos_badge}</td>
                     <td style="padding:4px 6px; color:#888; font-size:11px; text-align:right; white-space:nowrap;">{last_heard_str}</td>
@@ -214,10 +248,12 @@ def create_node_list_html(all_nodes: list, primary_node_id: str) -> str:
     </div>
     """
 
-    # Add click-to-locate JS
+    # Add search, filter, and click-to-locate JS
     html += f"""
     <script>
     window._nodeListPositions = {_json.dumps(node_positions)};
+
+    /* ---------- Locate on map ---------- */
     window._locateNode = function(nodeId) {{
         var pos = window._nodeListPositions[nodeId];
         if (!pos) return;
@@ -231,6 +267,62 @@ def create_node_list_html(all_nodes: list, primary_node_id: str) -> str:
             }}
         }}
     }};
+
+    /* ---------- Filter state ---------- */
+    window._activeFilter = 'all';
+
+    window._applyFilter = function(filter, chip) {{
+        window._activeFilter = filter;
+        document.querySelectorAll('.node-filter-chip').forEach(function(c) {{ c.classList.remove('active'); }});
+        if (chip) chip.classList.add('active');
+        window._filterNodeList();
+    }};
+
+    /* ---------- Combined search + filter ---------- */
+    window._filterNodeList = function() {{
+        var query = (document.getElementById('node-search-input').value || '').trim().toUpperCase();
+        var filter = window._activeFilter;
+        var rows = document.querySelectorAll('.node-row');
+        var shown = 0;
+        rows.forEach(function(row) {{
+            var nodeId = row.getAttribute('data-node-id') || '';
+            var hasPos = row.getAttribute('data-has-pos') === '1';
+            var hops = parseInt(row.getAttribute('data-hops') || '99', 10);
+            var matchSearch = !query || nodeId.toUpperCase().indexOf(query) !== -1;
+            var matchFilter = true;
+            if (filter === 'has-position') matchFilter = hasPos;
+            else if (filter === 'no-position') matchFilter = !hasPos;
+            else if (filter === 'direct') matchFilter = hops <= 1;
+            row.style.display = (matchSearch && matchFilter) ? '' : 'none';
+            if (matchSearch && matchFilter) shown++;
+        }});
+        var countEl = document.getElementById('node-list-count');
+        if (countEl) {{
+            if (query || filter !== 'all') {{
+                countEl.textContent = ' (showing ' + shown + ')';
+            }} else {{
+                countEl.textContent = '';
+            }}
+        }}
+    }};
+
+    /* ---------- Search input listeners ---------- */
+    (function() {{
+        var input = document.getElementById('node-search-input');
+        if (!input) return;
+        input.addEventListener('input', function() {{ window._filterNodeList(); }});
+        input.addEventListener('keydown', function(e) {{
+            if (e.key === 'Enter') {{
+                e.preventDefault();
+                // On Enter, also locate first visible node on the map
+                var firstVisible = document.querySelector('.node-row[style=""], .node-row:not([style*="display: none"])');
+                if (firstVisible) {{
+                    var nid = firstVisible.getAttribute('data-node-id');
+                    if (nid) window._locateNode(nid);
+                }}
+            }}
+        }});
+    }})();
     </script>
     """
 

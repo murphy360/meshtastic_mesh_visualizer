@@ -81,7 +81,6 @@ class MapService:
         # Add UI elements
         self._add_interactive_map_key(m, primary_node.id, visibility_settings, age_group_counts, mesh_data.last_update)
         self._add_sitrep_data(m, mesh_data)
-        self._add_node_search(m, mesh_data)
         self._add_node_list_panel(m, mesh_data, visibility_settings)
         
         logging.info(f"Map created with {total_nodes_count - filtered_nodes_count} visible nodes, {filtered_nodes_count} filtered out")
@@ -457,77 +456,6 @@ class MapService:
         primary_id = mesh_data.primary_node.id if mesh_data.primary_node else ""
         node_list_html = create_node_list_html(visible_nodes, primary_id)
         m.get_root().html.add_child(folium.Element(node_list_html))
-    
-    def _add_node_search(self, m: folium.Map, mesh_data: MeshData) -> None:
-        """Add a search box to find and center on nodes by name"""
-        import json as _json
-        # Build a lightweight lookup of node id -> [lat, lon]
-        node_positions = {}
-        for node in mesh_data.nodes:
-            if node.has_valid_position:
-                node_positions[node.id] = [node.lat, node.lon]
-        
-        sidebar_w = NODE_LIST_SIDEBAR['width']
-        search_html = f"""
-        <div id="node-search-box" style="position:fixed; top:10px; left:calc({sidebar_w} + (100% - {sidebar_w}) / 2); transform:translateX(-50%);
-             z-index:10000; background:white; border:2px solid #666; border-radius:6px;
-             padding:6px 10px; box-shadow:0 2px 8px rgba(0,0,0,0.3); display:flex; gap:6px; align-items:center;">
-            <i class="fa fa-search" style="color:#888;"></i>
-            <input id="node-search-input" type="text" placeholder="Search node..." 
-                   list="node-search-datalist"
-                   style="border:none; outline:none; font-size:14px; width:180px;">
-            <datalist id="node-search-datalist">
-                {''.join(f'<option value="{nid}">' for nid in sorted(node_positions.keys()))}
-            </datalist>
-            <button id="node-search-btn" style="border:1px solid #ccc; border-radius:4px; 
-                    background:#2196F3; color:white; padding:4px 10px; cursor:pointer; font-size:13px;">Go</button>
-            <span id="node-search-status" style="font-size:11px; color:#888; min-width:60px;"></span>
-        </div>
-        <script>
-        window._nodePositions = {_json.dumps(node_positions)};
-        (function() {{
-            function searchNode() {{
-                const input = document.getElementById('node-search-input');
-                const status = document.getElementById('node-search-status');
-                const query = input.value.trim().toUpperCase();
-                if (!query) return;
-                
-                // Find matching node (case-insensitive)
-                let match = null;
-                for (const [id, pos] of Object.entries(window._nodePositions)) {{
-                    if (id.toUpperCase().includes(query)) {{
-                        match = {{id: id, lat: pos[0], lon: pos[1]}};
-                        break;
-                    }}
-                }}
-                
-                if (match) {{
-                    status.textContent = match.id;
-                    status.style.color = '#4CAF50';
-                    // Find the Leaflet map and pan to the node
-                    const mapEl = document.querySelector('.folium-map');
-                    if (mapEl) {{
-                        for (const key of Object.keys(window)) {{
-                            const val = window[key];
-                            if (val && val._container === mapEl && typeof val.setView === 'function') {{
-                                val.setView([match.lat, match.lon], 15);
-                                break;
-                            }}
-                        }}
-                    }}
-                }} else {{
-                    status.textContent = 'Not found';
-                    status.style.color = '#f44336';
-                }}
-            }}
-            document.getElementById('node-search-btn')?.addEventListener('click', searchNode);
-            document.getElementById('node-search-input')?.addEventListener('keydown', function(e) {{
-                if (e.key === 'Enter') searchNode();
-            }});
-        }})();
-        </script>
-        """
-        m.get_root().html.add_child(folium.Element(search_html))
     
     def _add_sitrep_data(self, m: folium.Map, mesh_data: MeshData) -> None:
         """Add SITREP data display"""
