@@ -40,7 +40,7 @@ def create_interactive_map_key_html(
     
     key_html = f"""
     <div style="position: fixed; 
-                bottom: {MAP_KEY_POSITION['bottom']}; left: {MAP_KEY_POSITION['left']}; 
+                bottom: {MAP_KEY_POSITION['bottom']}; right: {MAP_KEY_POSITION['right']}; 
                 width: {MAP_KEY_POSITION['width']}; height: {MAP_KEY_POSITION['height']}; 
                 background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
         <b>Key - Click to Toggle Visibility</b><br>
@@ -128,61 +128,105 @@ def create_sitrep_html(sitrep_time: str, sitrep_lines: list) -> str:
     return sitrep_html
 
 
-def create_nodes_without_position_html(nodes_without_position: list) -> str:
-    """Generate HTML for the nodes without position display"""
-    # Sort nodes by last heard time and hops away
-    sorted_nodes = sorted(
-        nodes_without_position,
-        key=lambda x: (
-            x.last_heard_time.replace(tzinfo=None) if x.last_heard_time else datetime.min,
-            x.hops_away
+def create_node_list_html(all_nodes: list, primary_node_id: str) -> str:
+    """Generate HTML for the collapsible node list panel"""
+    import json as _json
+
+    # Sort: primary first, then by last heard (most recent first), then by hops
+    def sort_key(node):
+        if node.id == primary_node_id:
+            return (0, datetime.max, 0)
+        heard = node.last_heard_time.replace(tzinfo=None) if node.last_heard_time else datetime.min
+        return (1, heard, node.hops_away if node.hops_away >= 0 else 999)
+
+    sorted_nodes = sorted(all_nodes, key=sort_key, reverse=False)
+    # Reverse the non-primary nodes so most-recent is first
+    primary = [n for n in sorted_nodes if n.id == primary_node_id]
+    others = sorted(
+        [n for n in sorted_nodes if n.id != primary_node_id],
+        key=lambda n: (
+            n.last_heard_time.replace(tzinfo=None) if n.last_heard_time else datetime.min,
+            -(n.hops_away if n.hops_away >= 0 else 999)
         ),
         reverse=True
     )
-    
-    nodes_html = f"""
-    <div id="nodes_without_position" style="position: fixed; 
-                bottom: {NODES_WITHOUT_POSITION_CONFIG['bottom']}; right: {NODES_WITHOUT_POSITION_CONFIG['right']}; 
-                width: {NODES_WITHOUT_POSITION_CONFIG['width']}; height: {NODES_WITHOUT_POSITION_CONFIG['height']}; 
-                background-color: white; border:2px solid grey; z-index:9999; font-size:14px; padding: 10px;">
-        <button onclick="document.getElementById('nodes_without_position').style.display='none'">Minimize</button>
-        <b>Nodes Without Position Data:</b><br>
-        <div style="overflow-y: scroll; height: 150px;">
-            <table style="width: 100%; border-collapse: collapse;">
-                <thead>
-                    <tr>
-                        <th style="border: 1px solid black; padding: 5px;">Icon</th>
-                        <th style="border: 1px solid black; padding: 5px;">ID</th>
-                        <th style="border: 1px solid black; padding: 5px;">Heard</th>
-                        <th style="border: 1px solid black; padding: 5px;">Hops</th>
-                        <th style="border: 1px solid black; padding: 5px;">Connections</th>
-                    </tr>
-                </thead>
-                <tbody>
-    """
-    
+    sorted_nodes = primary + others
+
+    # Build node lookup for click-to-locate
+    node_positions = {}
     for node in sorted_nodes:
-        
-        color = node.color
-        icon_class = _get_node_icon_class(node)
-        hops_away_text = f"{node.hops_away}" if node.hops_away != -1 else "N/A"
-        connections = ", ".join(node.connections)
+        if node.has_valid_position:
+            node_positions[node.id] = [node.lat, node.lon]
+
+    pos = NODE_LIST_POSITION
+    html = f"""
+    <div id="node-list-panel" style="position:fixed; top:{pos['top']}; left:{pos['left']};
+         width:{pos['width']}; max-height:{pos['max_height']}; background:white; border:2px solid grey;
+         z-index:9998; font-size:13px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.2);
+         display:flex; flex-direction:column;">
+        <div style="display:flex; justify-content:space-between; align-items:center; padding:8px 10px;
+             border-bottom:1px solid #ddd; background:#f8f8f8; border-radius:4px 4px 0 0;">
+            <b>\U0001f4e1 Nodes ({len(sorted_nodes)})</b>
+            <button id="node-list-toggle" onclick="
+                var body=document.getElementById('node-list-body');
+                var btn=this;
+                if(body.style.display==='none'){{body.style.display='block';btn.textContent='\u25BC';}}
+                else{{body.style.display='none';btn.textContent='\u25B6';}}
+            " style="border:1px solid #ccc; border-radius:3px; background:white; cursor:pointer;
+                    padding:2px 6px; font-size:12px;">\u25BC</button>
+        </div>
+        <div id="node-list-body" style="overflow-y:auto; padding:4px 0;">
+            <table style="width:100%; border-collapse:collapse;">
+    """
+
+    for node in sorted_nodes:
+        color = COLOR_PRIMARY_NODE if node.id == primary_node_id else node.color
+        icon_class = 'fa-star' if node.id == primary_node_id else _get_node_icon_class(node)
         last_heard_str = time_since_last_heard(node.last_heard_time) if node.last_heard_time else "N/A"
-        
-        nodes_html += f"""
-                    <tr>
-                        <td style="border: 1px solid black; padding: 5px;"><i class='fa {icon_class}' style='color:{color}'></i></td>
-                        <td style="border: 1px solid black; padding: 5px;">{node.id}</td>
-                        <td style="border: 1px solid black; padding: 5px;">{last_heard_str}</td>
-                        <td style="border: 1px solid black; padding: 5px;">{hops_away_text}</td>
-                        <td style="border: 1px solid black; padding: 5px;">{connections}</td>
-                    </tr>
+        hops_text = "—" if node.id == primary_node_id else (str(node.hops_away) if node.hops_away >= 0 else "?")
+        has_pos = node.has_valid_position
+        cursor = "cursor:pointer;" if has_pos else ""
+        click_handler = f"onclick=\"window._locateNode('{node.id}')\"" if has_pos else ""
+        if has_pos:
+            hover = 'onmouseover="this.style.background=\'#f0f7ff\'" onmouseout="this.style.background=\'\'"'
+        else:
+            hover = ''
+        opacity = "" if has_pos else "opacity:0.55;"
+        no_pos_badge = "" if has_pos else " <span style='color:#aaa;font-size:10px;' title='No position data'>&#x26AB;</span>"
+
+        html += f"""
+                <tr {click_handler} style="border-bottom:1px solid #eee;{cursor}{opacity}" {hover}>
+                    <td style="padding:4px 6px; width:20px;"><i class="fa {icon_class}" style="color:{color}"></i></td>
+                    <td style="padding:4px 4px; font-weight:{'bold' if node.id == primary_node_id else 'normal'};">{node.id}{no_pos_badge}</td>
+                    <td style="padding:4px 6px; color:#888; font-size:11px; text-align:right; white-space:nowrap;">{last_heard_str}</td>
+                    <td style="padding:4px 6px; color:#888; font-size:11px; text-align:center; width:30px;" title="Hops">{hops_text}</td>
+                </tr>
         """
-    
-    nodes_html += """
-                </tbody>
+
+    html += """
             </table>
         </div>
     </div>
     """
-    return nodes_html
+
+    # Add click-to-locate JS
+    html += f"""
+    <script>
+    window._nodeListPositions = {_json.dumps(node_positions)};
+    window._locateNode = function(nodeId) {{
+        var pos = window._nodeListPositions[nodeId];
+        if (!pos) return;
+        var mapEl = document.querySelector('.folium-map');
+        if (!mapEl) return;
+        for (var key of Object.keys(window)) {{
+            var val = window[key];
+            if (val && val._container === mapEl && typeof val.setView === 'function') {{
+                val.setView([pos[0], pos[1]], 15);
+                break;
+            }}
+        }}
+    }};
+    </script>
+    """
+
+    return html

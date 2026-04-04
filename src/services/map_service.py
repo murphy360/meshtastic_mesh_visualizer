@@ -17,7 +17,7 @@ from utils.geo_utils import calculate_precision_radius
 from utils.template_utils import (
     create_interactive_map_key_html,
     create_sitrep_html,
-    create_nodes_without_position_html
+    create_node_list_html
 )
 
 
@@ -53,7 +53,6 @@ class MapService:
         time_thresholds = get_time_thresholds()
         
         # Process and add nodes
-        nodes_without_position = []
         filtered_nodes_count = 0
         total_nodes_count = 0
         age_group_counts = mesh_data.get_age_group_counts()
@@ -67,9 +66,7 @@ class MapService:
                 filtered_nodes_count += 1
                 continue
             
-            if not node.has_valid_position:
-                nodes_without_position.append(node)
-            else:
+            if node.has_valid_position:
                 self._add_node_to_map(m, node, time_thresholds, visibility_settings)
         
         # Always add the primary node
@@ -84,8 +81,8 @@ class MapService:
         # Add UI elements
         self._add_interactive_map_key(m, primary_node.id, visibility_settings, age_group_counts, mesh_data.last_update)
         self._add_sitrep_data(m, mesh_data)
-        self._add_nodes_without_position(m, nodes_without_position)
         self._add_node_search(m, mesh_data)
+        self._add_node_list_panel(m, mesh_data, visibility_settings)
         
         logging.info(f"Map created with {total_nodes_count - filtered_nodes_count} visible nodes, {filtered_nodes_count} filtered out")
         return m
@@ -447,6 +444,17 @@ class MapService:
         combined_html = key_html + js_code
         m.get_root().html.add_child(folium.Element(combined_html))
     
+    def _add_node_list_panel(self, m: folium.Map, mesh_data: MeshData, visibility_settings: Dict[str, bool]) -> None:
+        """Add a collapsible node list panel to the map"""
+        visible_nodes = [mesh_data.primary_node] if mesh_data.primary_node else []
+        for node in mesh_data.secondary_nodes:
+            if node.should_show(visibility_settings):
+                visible_nodes.append(node)
+        
+        primary_id = mesh_data.primary_node.id if mesh_data.primary_node else ""
+        node_list_html = create_node_list_html(visible_nodes, primary_id)
+        m.get_root().html.add_child(folium.Element(node_list_html))
+    
     def _add_node_search(self, m: folium.Map, mesh_data: MeshData) -> None:
         """Add a search box to find and center on nodes by name"""
         import json as _json
@@ -521,12 +529,6 @@ class MapService:
         """Add SITREP data display"""
         sitrep_html = create_sitrep_html(mesh_data.sitrep_time, mesh_data.sitrep)
         m.get_root().html.add_child(folium.Element(sitrep_html))
-    
-    def _add_nodes_without_position(self, m: folium.Map, nodes_without_position: List[MeshNode]) -> None:
-        """Add display for nodes without position data"""
-        if nodes_without_position:
-            nodes_html = create_nodes_without_position_html(nodes_without_position)
-            m.get_root().html.add_child(folium.Element(nodes_html))
     
     @staticmethod
     def delete_old_maps() -> None:

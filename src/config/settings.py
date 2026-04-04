@@ -39,7 +39,7 @@ AIRCRAFT_ALTITUDE_THRESHOLD = 5000  # meters
 # Map styling
 MAP_KEY_POSITION = {
     'bottom': '50px',
-    'left': '50px',
+    'right': '10px',
     'width': '360px',
     'height': '380px'
 }
@@ -50,11 +50,11 @@ SITREP_POSITION = {
     'width': '300px'
 }
 
-NODES_WITHOUT_POSITION_CONFIG = {
-    'bottom': '10px',
-    'right': '10px',
-    'width': '400px',
-    'height': '200px'
+NODE_LIST_POSITION = {
+    'top': '50px',
+    'left': '50px',
+    'width': '320px',
+    'max_height': '45vh'
 }
 
 # Precision radius calculations (in meters)
