@@ -10,6 +10,10 @@ COLOR_SEEN_LAST_WEEK = 'orange'
 COLOR_SEEN_OVER_WEEK = 'gray'
 COLOR_NO_LAST_HEARD = 'red'
 
+# Infrastructure node icon
+ICON_INFRASTRUCTURE = 'server'
+ICON_AIRCRAFT = 'plane'
+
 # Connection colors
 COLOR_CONNECTION_DEFAULT = 'green'
 COLOR_CONNECTION_NON_PRIMARY = 'gray'
@@ -44,4 +48,19 @@ HOP_RANGE_OPACITY = {
     1: 0.25,
     2: 0.2,
     3: 0.15
+}
+
+# Hex color equivalents for DivIcon / CircleMarker usage
+COLOR_HEX = {
+    'green': '#2AAD27',
+    'blue': '#2A81CB',
+    'orange': '#CB8427',
+    'gray': '#7B7B7B',
+    'red': '#CB2B3E',
+    'purple': '#9C2BCB',
+    'darkgreen': '#1D8A2A',
+    'lightblue': '#5BC0DE',
+    'lightgreen': '#8BC34A',
+    'lightyellow': '#FFEB3B',
+    'lightcoral': '#F08080',
 }

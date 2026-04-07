@@ -17,7 +17,7 @@ from utils.geo_utils import calculate_precision_radius
 from utils.template_utils import (
     create_interactive_map_key_html,
     create_sitrep_html,
-    create_nodes_without_position_html
+    create_node_list_html
 )
 
 
@@ -53,7 +53,6 @@ class MapService:
         time_thresholds = get_time_thresholds()
         
         # Process and add nodes
-        nodes_without_position = []
         filtered_nodes_count = 0
         total_nodes_count = 0
         age_group_counts = mesh_data.get_age_group_counts()
@@ -67,9 +66,7 @@ class MapService:
                 filtered_nodes_count += 1
                 continue
             
-            if not node.has_valid_position:
-                nodes_without_position.append(node)
-            else:
+            if node.has_valid_position:
                 self._add_node_to_map(m, node, time_thresholds, visibility_settings)
         
         # Always add the primary node
@@ -84,7 +81,7 @@ class MapService:
         # Add UI elements
         self._add_interactive_map_key(m, primary_node.id, visibility_settings, age_group_counts, mesh_data.last_update)
         self._add_sitrep_data(m, mesh_data)
-        self._add_nodes_without_position(m, nodes_without_position)
+        self._add_node_list_panel(m, mesh_data, visibility_settings)
         
         logging.info(f"Map created with {total_nodes_count - filtered_nodes_count} visible nodes, {filtered_nodes_count} filtered out")
         return m
@@ -95,12 +92,13 @@ class MapService:
             visibility_settings = DEFAULT_VISIBILITY_SETTINGS.copy()
         last_heard_str = time_since_last_heard(node.last_heard_time) if node.last_heard_time else "N/A"
         
-        # Create appropriate icon
+        # Build popup text
         if node.is_aircraft:
-            icon = folium.Icon(color=node.color, icon='plane', prefix='fa')
             popup_text = f"✈️ {node.id} (Aircraft)<br>Altitude: {node.alt}m<br>Last Heard: {last_heard_str}"
+        elif node.is_infrastructure:
+            logging.info(f"Infrastructure node detected: {node.id} (role={node.role})")
+            popup_text = f"🖧 {node.id} (Router)<br>Altitude: {node.alt}m<br>Last Heard: {last_heard_str}"
         else:
-            icon = folium.Icon(color=node.color)
             popup_text = f"{node.id}<br>Altitude: {node.alt}m<br>Last Heard: {last_heard_str}"
         
         if node.hops_away != 0:
@@ -111,12 +109,56 @@ class MapService:
             logging.info(f"Node {node.id} has precision bits: {node.precision_bits}")
             popup_text += f"<br>Precision: {node.precision_bits} bits"
         
-        # Add marker
-        marker = folium.Marker(
-            location=[node.lat, node.lon],
-            popup=popup_text,
-            icon=icon
-        )
+        # Determine age-based marker size
+        age = node.age_group
+        radius = MARKER_SIZE_BY_AGE.get(age, MARKER_SIZE_BY_AGE['over_week'])
+        hex_color = COLOR_HEX.get(node.color, '#7B7B7B')
+        fill_opacity = 0.85 if age == 'last_hour' else 0.7 if age == 'last_day' else 0.5
+        
+        # Pick a FontAwesome icon label for the tooltip
+        if node.is_aircraft:
+            icon_char = '✈'
+        elif node.is_infrastructure:
+            icon_char = '◆'
+        else:
+            icon_char = '●'
+        
+        if node.is_infrastructure:
+            # Diamond marker for infrastructure/router nodes
+            size = max(radius * 2 + 4, 10)
+            cx = cy = size // 2
+            r = radius
+            points = f"{cx},{cy - r} {cx + r},{cy} {cx},{cy + r} {cx - r},{cy}"
+            diamond_html = (
+                f'<svg width="{size}" height="{size}">'
+                f'<polygon points="{points}" '
+                f'fill="{hex_color}" stroke="{hex_color}" stroke-width="1" fill-opacity="{fill_opacity}"/>'
+                f'</svg>'
+            )
+            icon = folium.DivIcon(
+                icon_size=(size, size),
+                icon_anchor=(cx, cy),
+                html=diamond_html
+            )
+            marker = folium.Marker(
+                location=[node.lat, node.lon],
+                icon=icon,
+                popup=popup_text,
+                tooltip=f"{icon_char} {node.id}"
+            )
+        else:
+            # Circle marker for regular nodes
+            marker = folium.CircleMarker(
+                location=[node.lat, node.lon],
+                radius=radius,
+                color=hex_color,
+                fill=True,
+                fill_color=hex_color,
+                fill_opacity=fill_opacity,
+                weight=1,
+                popup=popup_text,
+                tooltip=f"{icon_char} {node.id}"
+            )
         marker.add_to(m)
         
         # Add precision circle if available and enabled in visibility settings
@@ -137,7 +179,13 @@ class MapService:
         if visibility_settings is None:
             visibility_settings = DEFAULT_VISIBILITY_SETTINGS.copy()
         icon = folium.Icon(color=COLOR_PRIMARY_NODE, icon='star', prefix='fa')
-        popup_text = f"{primary_node.id}<br>Altitude: {primary_node.alt}m"
+        popup_lines = [
+            f"\u2b50 {primary_node.id} (Primary)",
+            f"Altitude: {primary_node.alt}m",
+        ]
+        if primary_node.connections:
+            popup_lines.append(f"Connections: {len(primary_node.connections)}")
+        popup_text = "<br>".join(popup_lines)
         
         marker = folium.Marker(
             location=[primary_node.lat, primary_node.lon],
@@ -256,30 +304,56 @@ class MapService:
             init() {{
                 this.setupToggleListeners();
                 this.startRefreshInterval();
+                this.restoreMapView();
+            }}
+
+            // Find the Leaflet map instance from the Folium-generated page
+            _getLeafletMap() {{
+                const mapEl = document.querySelector('.folium-map');
+                if (mapEl && mapEl._leaflet_id) {{
+                    // Access Leaflet's internal map registry
+                    for (const key of Object.keys(window)) {{
+                        const val = window[key];
+                        if (val && val._container === mapEl) return val;
+                    }}
+                }}
+                return null;
+            }}
+
+            // Save current map center/zoom to sessionStorage before navigating away
+            _saveMapView() {{
+                const map = this._getLeafletMap();
+                if (map) {{
+                    const center = map.getCenter();
+                    sessionStorage.setItem('meshMapView', JSON.stringify({{
+                        lat: center.lat, lng: center.lng, zoom: map.getZoom()
+                    }}));
+                }}
+            }}
+
+            // Restore map center/zoom from sessionStorage after page load
+            restoreMapView() {{
+                const saved = sessionStorage.getItem('meshMapView');
+                // Small delay to let Folium finish initializing
+                setTimeout(() => {{
+                    const map = this._getLeafletMap();
+                    if (map) {{
+                        // Notify Leaflet the container size changed (sidebar layout)
+                        map.invalidateSize();
+                        if (saved) {{
+                            try {{
+                                const view = JSON.parse(saved);
+                                map.setView([view.lat, view.lng], view.zoom);
+                                console.log('Restored map view:', view);
+                            }} catch (e) {{
+                                console.warn('Could not restore map view:', e);
+                            }}
+                        }}
+                    }}
+                }}, 100);
             }}
 
             setupToggleListeners() {{
-                // Age group toggles
-                document.getElementById('toggle-last-hour')?.addEventListener('click', () => {{
-                    this.toggleVisibility('last_hour', this.visibilitySettings.show_last_hour);
-                }});
-
-                document.getElementById('toggle-last-day')?.addEventListener('click', () => {{
-                    this.toggleVisibility('last_day', this.visibilitySettings.show_last_day);
-                }});
-
-                document.getElementById('toggle-last-week')?.addEventListener('click', () => {{
-                    this.toggleVisibility('last_week', this.visibilitySettings.show_last_week);
-                }});
-
-                document.getElementById('toggle-over-week')?.addEventListener('click', () => {{
-                    this.toggleVisibility('over_week', this.visibilitySettings.show_over_week);
-                }});
-
-                document.getElementById('toggle-no-last-heard')?.addEventListener('click', () => {{
-                    this.toggleVisibility('no_last_heard', this.visibilitySettings.show_no_last_heard);
-                }});
-
                 // Coverage polygon toggles
                 document.getElementById('toggle-receive-range')?.addEventListener('click', () => {{
                     this.toggleVisibility('receive_range', this.visibilitySettings.show_receive_range);
@@ -305,6 +379,7 @@ class MapService:
 
             toggleVisibility(group, currentState) {{
                 console.log('Toggling visibility for group:', group, 'current state:', currentState);
+                this._saveMapView();
                 
                 // Build URL with toggled state
                 const url = new URL('/filter_map', window.location.origin);
@@ -328,6 +403,18 @@ class MapService:
                 console.log('Smooth refresh enabled - updating every 10 seconds');
             }}
 
+            _showUpdateIndicator() {{
+                let indicator = document.getElementById('mesh-update-indicator');
+                if (!indicator) {{
+                    indicator = document.createElement('div');
+                    indicator.id = 'mesh-update-indicator';
+                    indicator.style.cssText = 'position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#2196F3;color:white;padding:8px 20px;border-radius:4px;z-index:10000;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,0.3);transition:opacity 0.3s;';
+                    document.body.appendChild(indicator);
+                }}
+                indicator.textContent = 'Updating map...';
+                indicator.style.opacity = '1';
+            }}
+
             async refreshData() {{
                 try {{
                     const response = await fetch('/get_mesh_data');
@@ -342,6 +429,8 @@ class MapService:
                     // Check if actual node data has changed using hash
                     if (this.lastDataHash !== null && this.lastDataHash !== data.data_hash) {{
                         console.log('Node data changed, reloading map. Hash changed from', this.lastDataHash, 'to', data.data_hash);
+                        this._saveMapView();
+                        this._showUpdateIndicator();
                         window.location.reload();
                         return;
                     }}
@@ -359,6 +448,7 @@ class MapService:
                     this.refreshFailures++;
                     if (this.refreshFailures >= 3) {{
                         console.log('Multiple refresh failures, falling back to full page reload');
+                        this._saveMapView();
                         window.location.reload();
                     }}
                 }}
@@ -376,16 +466,20 @@ class MapService:
         combined_html = key_html + js_code
         m.get_root().html.add_child(folium.Element(combined_html))
     
+    def _add_node_list_panel(self, m: folium.Map, mesh_data: MeshData, visibility_settings: Dict[str, bool]) -> None:
+        """Add a collapsible node list panel to the map"""
+        # Include ALL nodes in the list — time filtering is done client-side
+        all_nodes = [mesh_data.primary_node] if mesh_data.primary_node else []
+        all_nodes.extend(mesh_data.secondary_nodes)
+        
+        primary_id = mesh_data.primary_node.id if mesh_data.primary_node else ""
+        node_list_html = create_node_list_html(all_nodes, primary_id, visibility_settings)
+        m.get_root().html.add_child(folium.Element(node_list_html))
+    
     def _add_sitrep_data(self, m: folium.Map, mesh_data: MeshData) -> None:
         """Add SITREP data display"""
         sitrep_html = create_sitrep_html(mesh_data.sitrep_time, mesh_data.sitrep)
         m.get_root().html.add_child(folium.Element(sitrep_html))
-    
-    def _add_nodes_without_position(self, m: folium.Map, nodes_without_position: List[MeshNode]) -> None:
-        """Add display for nodes without position data"""
-        if nodes_without_position:
-            nodes_html = create_nodes_without_position_html(nodes_without_position)
-            m.get_root().html.add_child(folium.Element(nodes_html))
     
     @staticmethod
     def delete_old_maps() -> None:

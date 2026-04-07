@@ -10,6 +10,9 @@ from config.colors import AGE_GROUP_COLORS, COLOR_NO_LAST_HEARD
 class MeshNode:
     """Represents a single mesh node with its properties and state"""
     
+    # Meshtastic roles considered infrastructure (routers/repeaters)
+    INFRASTRUCTURE_ROLES = {2, 3, 4, 'ROUTER', 'ROUTER_CLIENT', 'ROUTER_LATE', 'REPEATER'}
+
     def __init__(self, node_data: Dict[str, Any]):
         self.id = node_data.get('id', '')
         self.lat = node_data.get('lat', 0.0)
@@ -19,6 +22,7 @@ class MeshNode:
         self.hops_away = node_data.get('hopsAway', -1)
         self.connections = node_data.get('connections', [])
         self.precision_bits = node_data.get('precision_bits')
+        self.role = node_data.get('role', '')
         
         # Computed properties
         self._last_heard_time = None
@@ -43,6 +47,11 @@ class MeshNode:
             self._is_aircraft = self.alt > AIRCRAFT_ALTITUDE_THRESHOLD
         return self._is_aircraft
     
+    @property
+    def is_infrastructure(self) -> bool:
+        """Determine if this node is an infrastructure node (router/repeater)"""
+        return self.role in self.INFRASTRUCTURE_ROLES
+
     @property
     def has_valid_position(self) -> bool:
         """Check if the node has valid position data"""
@@ -78,5 +87,6 @@ class MeshNode:
             'lastHeard': self.last_heard,
             'hopsAway': self.hops_away,
             'connections': self.connections,
-            'precision_bits': self.precision_bits
+            'precision_bits': self.precision_bits,
+            'role': self.role
         }

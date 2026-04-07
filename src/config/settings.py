@@ -39,7 +39,7 @@ AIRCRAFT_ALTITUDE_THRESHOLD = 5000  # meters
 # Map styling
 MAP_KEY_POSITION = {
     'bottom': '50px',
-    'left': '50px',
+    'right': '10px',
     'width': '360px',
     'height': '380px'
 }
@@ -50,11 +50,17 @@ SITREP_POSITION = {
     'width': '300px'
 }
 
-NODES_WITHOUT_POSITION_CONFIG = {
-    'bottom': '10px',
-    'right': '10px',
-    'width': '400px',
-    'height': '200px'
+NODE_LIST_SIDEBAR = {
+    'width': '300px'
+}
+
+# Age-based marker sizing (radius in pixels for CircleMarker)
+MARKER_SIZE_BY_AGE = {
+    'last_hour': 10,
+    'last_day': 7,
+    'last_week': 4,
+    'over_week': 2,
+    'no_last_heard': 2
 }
 
 # Precision radius calculations (in meters)
